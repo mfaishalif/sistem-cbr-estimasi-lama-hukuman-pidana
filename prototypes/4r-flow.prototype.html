@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="id">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Prototipe alur CBR · Estimasi lama hukuman</title>
+<style>
+:root{color-scheme:dark;--bg:#010102;--panel:#0f1011;--raised:#141516;--border:#23252a;--ink:#f7f8f8;--muted:#8a8f98;--accent:#5e6ad2}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 "Segoe UI",sans-serif}button,input,textarea{font:inherit}button{cursor:pointer;border:1px solid #34343a;border-radius:6px;background:var(--raised);color:var(--ink);padding:8px 12px}button:hover{background:#23252a}button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #828fff;outline-offset:3px}button:disabled{opacity:.4;cursor:default}.primary{background:var(--accent);border-color:var(--accent)}.primary:hover{background:#707ce2}a{color:#a4adff}header{padding:18px 28px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:16px;align-items:center}header strong{font-weight:600;letter-spacing:-.3px}.badge{font-size:11px;border:1px solid #34343a;border-radius:20px;padding:4px 9px;color:#d0d6e0}.layout{display:grid;grid-template-columns:200px minmax(0,1fr);min-height:calc(100vh - 64px)}nav{border-right:1px solid var(--border);padding:26px 16px}nav button{display:block;width:100%;text-align:left;margin-bottom:8px;background:transparent;border-color:transparent}nav button[aria-current=page]{background:var(--raised);border-color:var(--border)}nav p{padding:0 12px;font-size:12px;color:var(--muted)}main{max-width:1250px;width:100%;margin:auto;padding:36px 40px}h1{font-size:28px;line-height:1.2;letter-spacing:-.6px;margin:8px 0 14px;font-weight:600}h2{font-size:17px;letter-spacing:-.2px;margin:0 0 12px}h3{font-size:14px;margin:0 0 8px}p{margin:8px 0 16px}.muted,small{color:var(--muted)}small{display:block}.eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted)}.grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(260px,1fr);gap:18px;align-items:start}.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:22px;margin-bottom:18px}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.between{justify-content:space-between}.stack{display:grid;gap:14px}label{display:block;font-size:12px;color:#d0d6e0}input,textarea{width:100%;display:block;background:var(--bg);border:1px solid #34343a;border-radius:6px;padding:10px;color:var(--ink);margin-top:6px}textarea{min-height:100px;resize:vertical}.fields{display:grid;grid-template-columns:1fr 1fr;gap:14px}.steps{display:flex;gap:8px;flex-wrap:wrap;margin:22px 0}.steps span{border:1px solid var(--border);padding:7px 12px;border-radius:6px;color:var(--muted)}.steps .done{color:var(--ink);background:var(--raised)}.metric{font-size:40px;letter-spacing:-1px;line-height:1.2;margin:12px 0}.metric small{font-size:13px;letter-spacing:0}.message{padding:12px 16px;border-left:2px solid var(--accent);background:var(--raised);margin:18px 0;min-height:46px}dl{margin:0}dt{color:var(--muted);font-size:12px;margin-top:12px}dd{margin:4px 0;overflow-wrap:anywhere}.table-wrap{overflow:auto}table{border-collapse:collapse;width:100%;font-size:12px}th,td{padding:12px 8px;text-align:left;border-bottom:1px solid var(--border);vertical-align:top}th{font-weight:500;color:var(--muted)}td button{font-size:12px;padding:5px 8px}details{margin-top:14px}summary{cursor:pointer;color:#d0d6e0}.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}.tabs [aria-selected=true]{border-color:var(--accent)}.walk button{margin:4px}.walk button[aria-current=step]{border-color:var(--accent)}footer{font-size:12px;color:var(--muted);margin-top:24px}.hidden{display:none!important}dialog{background:var(--panel);border:1px solid #34343a;color:var(--ink);border-radius:12px;padding:24px;width:min(520px,95vw)}dialog::backdrop{background:#000b}dialog h2{margin-bottom:20px}.spaced{margin-top:18px}@media(max-width:900px){.layout{grid-template-columns:1fr}nav{display:flex;border-right:0;border-bottom:1px solid var(--border);padding:10px;gap:8px}nav button{width:auto;margin:0}nav p{display:none}main{padding:24px 18px}.grid{grid-template-columns:1fr}}@media(max-width:520px){header{padding:14px 18px}.fields{grid-template-columns:1fr}}
+</style>
+<header><strong>◈ &nbsp; Estimasi lama hukuman</strong><span class="badge">PROTOTIPE · DATA FIKTIF</span></header>
+<div class="layout">
+<nav aria-label="Navigasi utama"><button data-page="estimate" aria-current="page">＋ &nbsp; Kasus baru</button><button data-page="base">▤ &nbsp; Basis kasus</button><p>CBR / tugas kuliah<br>Retrieve → Reuse → Revise → Retain</p></nav>
+<main>
+<div class="eyebrow">Eksplorasi alur · bukan aplikasi final</div>
+<h1>Dari fakta perkara ke pengalaman baru.</h1>
+<p class="muted">Apakah alur ini memudahkan mahasiswa membedakan estimasi, hasil aktual, dan kasus yang sudah masuk basis kasus?</p>
+<div class="card"><strong>Coba alurnya</strong><p class="muted">Semua data fiktif dan hanya tersimpan selama halaman terbuka. Metode, skor, dan kolom fakta di sini adalah ilustrasi; metode akhir belum dipilih.</p>
+<div id="scenario-tabs" class="tabs" role="tablist" aria-label="Skenario terpandu"></div><div id="walk" class="walk" role="tabpanel"></div>
+</div>
+<div id="notice" class="message" role="status" aria-live="polite"></div>
+<div class="grid">
+<section>
+<div id="estimate-page">
+<div class="steps" id="steps" aria-label="Tahapan CBR"></div>
+<form id="facts-form" class="card stack">
+<div><h2>1. Fakta kasus baru</h2><small>Satu terdakwa dalam satu perkara. Isi informasi yang diketahui sebelum putusan.</small></div>
+<div class="fields"><label>Nomor perkara / penanda contoh<input name="caseNo" required></label><label>Penanda terdakwa<input name="defendant" required></label></div>
+<label>Uraian fakta sebelum putusan<textarea name="facts" required></textarea></label>
+<small>Jangan masukkan amar, lama hukuman, tuntutan durasi jaksa, atau pertimbangan hakim.</small>
+<div class="row"><button class="primary" type="submit">Retrieve · cari kasus referensi</button><button type="button" id="new-case">Kasus baru</button></div>
+<small>Mengirim fakta yang berubah membatalkan estimasi dan hasil aktual pada kasus kerja ini.</small>
+</form>
+<div id="references" class="card"></div>
+<div id="result" class="card"></div>
+<form id="actual-form" class="card stack"><div><h2>4. Hasil aktual dan Revise</h2><small>Diisi setelah putusan kasus ini diketahui.</small></div><label>Pidana penjara aktual (hari)<input name="days" type="number" min="1" step="1" required placeholder="Contoh: 540"></label><small>Konvensi durasi: 1 tahun = 360 hari, 1 bulan = 30 hari. Bukan tanggal bebas.</small><div class="row"><button type="submit">Simpan hasil aktual</button><button type="button" id="revise">Revise · gunakan hasil aktual</button></div><p id="actual-summary" class="muted"></p></form>
+<div class="card"><h2>5. Retain</h2><p id="retain-summary" class="muted"></p><button id="retain" class="primary">Retain · tambahkan ke basis kasus</button></div>
+</div>
+<div id="base-page" class="hidden"><div class="card"><div class="row between"><div><h2>Basis kasus</h2><small>Data aktif untuk Retrieve berikutnya.</small></div><button id="create-record">＋ Tambah kasus historis</button></div><div class="table-wrap"><table><thead><tr><th>Perkara / terdakwa</th><th>Fakta</th><th>Aktual</th><th>Tindakan</th></tr></thead><tbody id="records"></tbody></table></div></div></div>
+</section>
+<aside>
+<div class="card"><div class="eyebrow">Keadaan kasus kerja</div><h2 class="spaced" id="state-heading"></h2><dl id="state"></dl></div>
+<div class="card"><h2>Jelajah bebas</h2><p class="muted">Coba tindakan dalam urutan apa pun. Tindakan yang belum memenuhi syarat menjelaskan alasannya.</p><div class="row"><button data-action="demoRetrieve">Retrieve contoh</button><button data-action="reuse">Reuse</button><button data-action="demoActual">Isi aktual 540 hari</button><button data-action="revise">Revise</button><button data-action="retain">Retain</button><button data-action="base">Lihat basis kasus</button><button data-action="reset">Reset demo</button></div></div>
+<small>Estimasinya menggambarkan pola historis pada demo. Skor kemiripan bukan peluang ketepatan atau tingkat keyakinan.</small>
+</aside>
+</div>
+<footer>Prototipe untuk diskusi alur 4R. Muat ulang atau Reset demo untuk mengembalikan seluruh contoh. Koreksi dan hapus memakai CRUD biasa.</footer>
+</main></div>
+<dialog id="record-dialog"><form id="record-form" class="stack"><h2 id="record-title"></h2><label>Nomor perkara<input name="caseNo" required></label><label>Penanda terdakwa<input name="defendant" required></label><label>Fakta sebelum putusan<textarea name="facts" required></textarea></label><label>Hasil aktual (hari)<input name="days" type="number" min="1" step="1" required></label><div class="row"><button class="primary" type="submit">Simpan kasus</button><button type="button" id="cancel-record">Batal</button></div></form></dialog>
+<script>
+// Pure, portable state model. All fixtures and retrieval scores are illustrative.
+const Flow = (() => {
+  const example = {caseNo:'DEMO-004',defendant:'Terdakwa D',facts:'Contoh fiktif: terdakwa mengambil barang milik orang lain bersama seorang rekan. Uraian kejadian tersedia sebelum putusan.'};
+  const initial = () => ({base:[
+    {id:1,caseNo:'DEMO-001',defendant:'Terdakwa A',facts:'Contoh fiktif: pengambilan barang oleh satu orang.',days:540},
+    {id:2,caseNo:'DEMO-002',defendant:'Terdakwa B',facts:'Contoh fiktif: pengambilan barang bersama seorang rekan.',days:720},
+    {id:3,caseNo:'DEMO-003',defendant:'Terdakwa C',facts:'Contoh fiktif: pengambilan barang oleh beberapa orang.',days:900}
+  ],nextId:4,draft:{...example},refs:null,estimate:null,actual:null,revised:false,retainedId:null,page:'estimate',message:'Mulai dengan skenario terpandu atau isi fakta kasus baru.'});
+  const validDays = n => Number.isSafeInteger(n) && n > 0;
+  const reduce = (prev, action) => {
+    if(action.type==='reset') return initial();
+    const s=structuredClone(prev), fail=message=>({...s,message});
+    switch(action.type){
+      case 'page':s.page=action.page;break;
+      case 'new':s.draft={...example,caseNo:'DEMO-BARU-'+s.nextId};s.refs=null;s.estimate=null;s.actual=null;s.revised=false;s.retainedId=null;s.page='estimate';s.message='Kasus kerja baru. Kasus yang telah disimpan tetap ada di basis kasus.';break;
+      case 'retrieve':{
+        if(!action.draft.caseNo.trim()||!action.draft.defendant.trim()||!action.draft.facts.trim())return fail('Lengkapi penanda perkara, terdakwa, dan fakta.');
+        if(!s.base.length)return fail('Basis kasus kosong. Tambahkan kasus historis dengan hasil aktual terlebih dahulu.');
+        const changed=JSON.stringify(s.draft)!==JSON.stringify(action.draft);
+        if(s.retainedId && !changed)return fail('Kasus ini sudah ditambahkan. Mulai kasus baru untuk estimasi berikutnya.');
+        s.draft={...action.draft};s.refs=s.base.slice(-3).reverse().map((r,i)=>({...r,score:[.87,.81,.76][i]}));s.estimate=null;s.actual=null;s.revised=false;s.retainedId=null;s.page='estimate';
+        s.message='Retrieve selesai: urutan dan skor referensi disimulasikan, belum memakai kemiripan fakta sebenarnya.';break;}
+      case 'reuse':
+        if(!s.refs)return fail('Jalankan Retrieve terlebih dahulu.');
+        if(s.estimate!==null)return fail('Estimasi awal sudah ada dan tetap ditampilkan terpisah dari hasil aktual.');
+        s.estimate=Math.round(s.refs.reduce((n,r)=>n+r.days,0)/s.refs.length);s.message='Reuse menghasilkan estimasi ilustratif dari rata-rata durasi referensi.';break;
+      case 'actual':
+        if(s.estimate===null)return fail('Hasil aktual pada alur ini dimasukkan setelah estimasi tersedia. Kasus historis dapat ditambah melalui Basis kasus.');
+        if(s.retainedId)return fail('Kasus sudah masuk basis kasus. Gunakan Ubah pada Basis kasus untuk koreksi.');
+        if(!validDays(action.days))return fail('Isi hasil aktual dalam hari bulat positif.');
+        s.actual=action.days;s.revised=false;s.message='Hasil aktual dicatat. Estimasi awal tetap '+s.estimate+' hari; lanjutkan ke Revise.';break;
+      case 'revise':
+        if(s.actual===null)return fail('Hasil aktual belum diketahui. Masukkan hasil putusan sebelum Revise.');
+        if(s.retainedId)return fail('Kasus ini sudah ditambahkan ke basis kasus.');
+        s.revised=true;s.message='Revise selesai: hasil penyelesaian kasus menggunakan aktual '+s.actual+' hari. Estimasi awal tetap terlihat.';break;
+      case 'retain':
+        if(s.retainedId)return fail('Kasus sudah ditambahkan. Retain ulang tidak membuat salinan.');
+        if(s.actual===null)return fail('Retain belum tersedia: hasil aktual belum diisi. Estimasi tidak disimpan sebagai hasil aktual.');
+        if(!s.revised)return fail('Jalankan Revise untuk memakai hasil aktual sebelum Retain.');
+        if(s.base.some(r=>r.caseNo===s.draft.caseNo&&r.defendant===s.draft.defendant))return fail('Penanda perkara dan terdakwa sudah ada. Periksa atau koreksi melalui Basis kasus.');
+        s.retainedId=s.nextId++;s.base.push({id:s.retainedId,...s.draft,days:s.actual});s.message='Retain selesai: aktual '+s.actual+' hari ditambahkan. Kasus ini tersedia untuk Retrieve berikutnya.';break;
+      case 'save':{
+        const r=action.record;
+        if(!r.caseNo.trim()||!r.defendant.trim()||!r.facts.trim()||!validDays(r.days))return fail('Lengkapi fakta dan hasil aktual positif.');
+        if(s.base.some(x=>x.id!==r.id&&x.caseNo===r.caseNo&&x.defendant===r.defendant))return fail('Penanda perkara dan terdakwa sudah ada.');
+        if(r.id)s.base=s.base.map(x=>x.id===r.id?{...r}:x);else s.base.push({...r,id:s.nextId++});
+        s.message='Kasus disimpan sebagai data aktif. Perubahan dipakai pada Retrieve berikutnya; estimasi yang sudah tampil tetap sama.';break;}
+      case 'delete':s.base=s.base.filter(r=>r.id!==action.id);s.message='Kasus dihapus dari basis kasus dan tidak dipakai pada Retrieve berikutnya.';break;
+    }
+    return s;
+  };
+  return {initial,reduce,example};
+})();
+</script>
+<script>
+// Throwaway presentation shell. Nothing persists beyond this page.
+const $=id=>document.getElementById(id), esc=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let state=Flow.initial(), editingId=null, scenario=0, step=0;
+const cases=[
+ {title:'Alur lengkap',description:'Dari fakta sampai hasil aktual menjadi pengalaman baru. Perhatikan: estimasi awal tetap 720 hari, kasus baru disimpan dengan aktual 540 hari.',steps:[['Cari referensi','demoRetrieve'],['Hasilkan estimasi','reuse'],['Isi aktual 540 hari','demoActual'],['Revise','revise'],['Retain','retain'],['Lihat kasus tersimpan','base']]},
+ {title:'Aktual belum diketahui',description:'Coba Retain setelah estimasi tersedia. Kasus tetap belum masuk basis kasus selama hasil aktual belum diketahui.',steps:[['Cari referensi','demoRetrieve'],['Hasilkan estimasi','reuse'],['Coba Retain','retain']]},
+ {title:'Retain dua kali',description:'Jalankan alur sampai selesai, lalu ulangi Retain. Jumlah kasus tidak bertambah lagi.',steps:[['Cari referensi','demoRetrieve'],['Reuse','reuse'],['Isi aktual','demoActual'],['Revise','revise'],['Retain pertama','retain'],['Retain lagi','retain']]},
+ {title:'Koreksi dan hapus',description:'Lihat basis kasus, ubah durasi atau fakta, lalu hapus satu contoh. Mulai kasus baru dan Retrieve untuk melihat basis kasus aktif.',steps:[['Buka basis kasus','base'],['Ubah contoh pertama','editFirst'],['Mulai kasus baru','new'],['Retrieve ulang','demoRetrieve']]}
+];
+function dispatch(action){state=Flow.reduce(state,action);render();}
+function perform(name){
+  if(name==='demoRetrieve')return dispatch({type:'retrieve',draft:{...state.draft}});
+  if(name==='demoActual')return dispatch({type:'actual',days:540});
+  if(name==='base')return dispatch({type:'page',page:'base'});
+  if(name==='editFirst'){dispatch({type:'page',page:'base'});if(state.base[0])openRecord(state.base[0].id);return;}
+  dispatch({type:name});
+}
+function render(){
+  $('notice').textContent=state.message;
+  document.querySelectorAll('[data-page]').forEach(b=>b.setAttribute('aria-current',b.dataset.page===state.page?'page':'false'));
+  $('estimate-page').classList.toggle('hidden',state.page!=='estimate');$('base-page').classList.toggle('hidden',state.page!=='base');
+  for(const key of ['caseNo','defendant','facts'])$('facts-form').elements[key].value=state.draft[key];
+  $('steps').innerHTML=[['Retrieve',!!state.refs],['Reuse',state.estimate!==null],['Revise',state.revised],['Retain',!!state.retainedId]].map(([n,done])=>`<span class="${done?'done':''}">${done?'✓ ':''}${n}</span>`).join('');
+  $('references').innerHTML='<h2>2. Retrieve · kasus referensi</h2>'+(!state.refs?'<p class="muted">Kasus referensi muncul setelah pencarian.</p>':`<small>Data fiktif · skor dan urutan disimulasikan. Ringkasan ini membandingkan fakta serta hasil aktual referensi.</small><div class="table-wrap"><table><thead><tr><th>Referensi / fakta</th><th>Skor contoh</th><th>Aktual</th></tr></thead><tbody>${state.refs.map(r=>`<tr><td><strong>${esc(r.caseNo)} · ${esc(r.defendant)}</strong><br>${esc(r.facts)}</td><td>${r.score.toFixed(2)}</td><td>${r.days} hari</td></tr>`).join('')}</tbody></table></div><small class="spaced">Skor kemiripan bukan tingkat keyakinan estimasi.</small>`);
+  $('result').innerHTML='<h2>3. Reuse · estimasi lama hukuman</h2>'+(state.estimate===null?'<p class="muted">Gunakan hasil Retrieve untuk menghasilkan estimasi.</p><button id="reuse-result" class="primary">Reuse · hasilkan estimasi</button>':`<div class="metric">${state.estimate} <span style="font-size:18px">hari</span><small>Estimasi sebelum hasil aktual diketahui</small></div><details open><summary>Bagaimana estimasi contoh diperoleh?</summary><p class="muted">Ilustrasi: rata-rata hasil aktual referensi, dibulatkan ke hari terdekat.<br>(${state.refs.map(r=>r.days).join(' + ')}) ÷ ${state.refs.length} ≈ ${state.estimate} hari.</p><small>Rumus ini hanya untuk mencoba alur, bukan keputusan metode Retrieve–Reuse.</small></details>`);
+  if($('reuse-result'))$('reuse-result').onclick=()=>perform('reuse');
+  $('actual-form').elements.days.value=state.actual??'';
+  $('actual-form').elements.days.disabled=!!state.retainedId;
+  $('actual-summary').textContent=state.actual===null?'Hasil aktual belum diketahui. Estimasi belum dapat menjadi pengalaman baru.':`Aktual: ${state.actual} hari · ${state.revised?'Revise selesai':'Belum di-Revise'} · Estimasi awal: ${state.estimate} hari.`;
+  $('retain-summary').textContent=state.retainedId?'Kasus sudah ditambahkan dengan hasil aktual. Buka Basis kasus untuk melihat, mengoreksi, atau menghapusnya.':state.revised?`Siap menambahkan kasus beserta aktual ${state.actual} hari. Estimasi ${state.estimate} hari tetap dibedakan.`:'Retain tersedia setelah hasil aktual diisi dan Revise dilakukan.';
+  $('retain').disabled=!!state.retainedId||!state.revised;
+  $('revise').disabled=state.actual===null||!!state.retainedId;
+  const status=state.retainedId?'Sudah masuk basis kasus':state.revised?'Siap untuk Retain':state.actual!==null?'Hasil aktual tersedia':state.estimate!==null?'Menunggu hasil aktual':state.refs?'Referensi tersedia':'Fakta kasus baru';
+  $('state-heading').textContent=status;
+  const data=[['Unit kasus',state.draft.caseNo+' / '+state.draft.defendant],['Fakta sebelum putusan',state.draft.facts],['Referensi saat estimasi',state.refs?state.refs.map(r=>r.caseNo).join(', '):'Belum dicari'],['Estimasi awal',state.estimate===null?'Belum dihasilkan':state.estimate+' hari'],['Hasil aktual',state.actual===null?'Belum diketahui':state.actual+' hari'],['Hasil setelah Revise',state.revised?state.actual+' hari':'Belum dilakukan'],['Retain',state.retainedId?'Selesai · '+(state.base.some(r=>r.id===state.retainedId)?'kasus masih aktif':'kasus telah dihapus'):'Belum dilakukan'],['Basis kasus aktif',state.base.length+' kasus']];
+  $('state').innerHTML=data.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
+  $('records').innerHTML=state.base.map(r=>`<tr><td><strong>${esc(r.caseNo)}</strong><br>${esc(r.defendant)}</td><td>${esc(r.facts)}</td><td>${r.days} hari</td><td><div class="row"><button data-edit="${r.id}">Ubah</button><button data-delete="${r.id}">Hapus</button></div></td></tr>`).join('')||'<tr><td colspan="4">Belum ada kasus. Tambahkan kasus historis dengan hasil aktual.</td></tr>';
+  document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openRecord(Number(b.dataset.edit)));
+  document.querySelectorAll('[data-delete]').forEach(b=>b.onclick=()=>{const r=state.base.find(x=>x.id===Number(b.dataset.delete));if(confirm('Hapus '+r.caseNo+' / '+r.defendant+' dari basis kasus?'))dispatch({type:'delete',id:r.id});});
+  $('scenario-tabs').innerHTML=cases.map((c,i)=>`<button role="tab" id="tab-${i}" aria-controls="walk" aria-selected="${scenario===i}" data-scenario="${i}">${c.title}</button>`).join('');
+  $('walk').setAttribute('aria-labelledby','tab-'+scenario);
+  $('walk').innerHTML=`<p class="muted">${cases[scenario].description}</p>`+cases[scenario].steps.map(([label],i)=>`<button data-step="${i}" ${i!==step?'disabled':''} aria-current="${i===step?'step':'false'}">${i+1}. ${label}</button>`).join('')+(step===cases[scenario].steps.length?'<small>Skenario selesai. Lanjutkan jelajah bebas atau pilih skenario lain.</small>':'');
+  document.querySelectorAll('[data-scenario]').forEach(b=>b.onclick=()=>{scenario=Number(b.dataset.scenario);step=0;dispatch({type:'reset'});});
+  document.querySelectorAll('[data-step]').forEach(b=>b.onclick=()=>{const action=cases[scenario].steps[step][1];step++;perform(action);});
+}
+function openRecord(id){
+  editingId=id??null;const r=state.base.find(x=>x.id===id)||{caseNo:'',defendant:'',facts:'',days:''};
+  $('record-title').textContent=id?'Ubah kasus historis':'Tambah kasus historis';
+  for(const k of ['caseNo','defendant','facts','days'])$('record-form').elements[k].value=r[k];$('record-dialog').showModal();
+}
+$('facts-form').onsubmit=e=>{e.preventDefault();const f=e.currentTarget.elements;dispatch({type:'retrieve',draft:{caseNo:f.caseNo.value,defendant:f.defendant.value,facts:f.facts.value}});};
+$('actual-form').onsubmit=e=>{e.preventDefault();dispatch({type:'actual',days:Number(e.currentTarget.elements.days.value)});};
+$('record-form').onsubmit=e=>{e.preventDefault();const f=e.currentTarget.elements,record={id:editingId,caseNo:f.caseNo.value,defendant:f.defendant.value,facts:f.facts.value,days:Number(f.days.value)};dispatch({type:'save',record});if(state.base.some(r=>r.caseNo===record.caseNo&&r.defendant===record.defendant&&r.days===record.days&&r.facts===record.facts))$('record-dialog').close();};
+$('cancel-record').onclick=()=>$('record-dialog').close();$('create-record').onclick=()=>openRecord();
+$('new-case').onclick=()=>perform('new');$('revise').onclick=()=>perform('revise');$('retain').onclick=()=>perform('retain');
+document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>dispatch({type:'page',page:b.dataset.page}));
+document.querySelectorAll('[data-action]').forEach(b=>b.onclick=()=>{if(b.dataset.action==='reset')step=0;perform(b.dataset.action);});
+render();
+</script>
+</html>
