@@ -2,7 +2,7 @@
 
 Artefak diskusi untuk [Tentukan alur antarmuka estimasi hingga Revise dan Retain](https://github.com/mfaishalif/sistem-cbr-estimasi-lama-hukuman-pidana/issues/11), pada [Peta pengembangan aplikasi tugas kuliah estimasi lama hukuman pidana berbasis CBR](https://github.com/mfaishalif/sistem-cbr-estimasi-lama-hukuman-pidana/issues/2).
 
-**Status: usulan alur, menunggu tanggapan pengguna. Bukan implementasi final atau keputusan metode.**
+**Status: alur disetujui pengguna pada 18 November 2026. Daftar input dan metode masih terbuka. Bukan implementasi final.**
 
 Buka `4r-flow.prototype.html` dengan klik dua kali. Tidak ada instalasi, server, koneksi jaringan, atau penyimpanan permanen. Muat ulang halaman untuk reset.
 
@@ -22,6 +22,6 @@ Apakah alur ini membantu mahasiswa memasukkan fakta satu terdakwa–perkara, mem
 
 Seluruh contoh adalah data fiktif. Penanda perkara, terdakwa, dan teks fakta hanya cukup untuk menguji alur; ini tidak mengunci representasi fakta atau rancangan database. Skor dan urutan referensi disimulasikan. Rata-rata durasi referensi hanya ilustrasi agar perubahan alur bisa dilihat, bukan metode Retrieve–Reuse yang telah dipilih. Tidak ada hasil eksperimen atau klaim akurasi.
 
-## Umpan balik yang diperlukan
+## Tanggapan pengguna dan tindak lanjut
 
-Apakah pemisahan langkah hasil aktual, Revise, dan Retain sudah jelas, atau perlu diringkas? Apakah perbandingan referensi dan CRUD sudah cukup untuk tugas kuliah? Catat tanggapan serta keputusan pada komentar resolusi tiket setelah diskusi, lalu tautkan artefak branch ini. Jangan menggabungkan HTML prototipe ke aplikasi produksi.
+Pengguna menyatakan: "alur sudah oke, namun aku masih bingung apa saja input sistem". Alur diterima; ini tidak mengunci kolom fakta atau metode. Pertanyaan bentuk input (narasi, atribut terstruktur, atau gabungan), kolom wajib/opsional, dan informasi yang dipakai untuk kemiripan dilanjutkan pada [Tentukan representasi fakta perkara dan metode Retrieve–Reuse](https://github.com/mfaishalif/sistem-cbr-estimasi-lama-hukuman-pidana/issues/12). Resolusi alur dicatat pada tiket prototipe. Jangan menggabungkan HTML prototipe ke aplikasi produksi.
