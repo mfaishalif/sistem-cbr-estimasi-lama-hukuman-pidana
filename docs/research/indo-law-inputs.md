@@ -1,6 +1,6 @@
 # Kandidat input dari sampel mentah Indo-Law
 
-Pemeriksaan: 18 November 2026. Menjawab [riset #13](https://github.com/mfaishalif/sistem-cbr-estimasi-lama-hukuman-pidana/issues/13) untuk [keputusan #12 yang tetap terbuka](https://github.com/mfaishalif/sistem-cbr-estimasi-lama-hukuman-pidana/issues/12).
+Pemeriksaan: 18 November 2026. Menjawab [Eksplorasi kandidat input dari sampel mentah Indo-Law](https://github.com/mfaishalif/sistem-cbr-estimasi-lama-hukuman-pidana/issues/13) untuk [Tentukan representasi fakta perkara dan metode Retrieve?Reuse yang tetap terbuka](https://github.com/mfaishalif/sistem-cbr-estimasi-lama-hukuman-pidana/issues/12).
 
 ## Jawaban yang didukung sampel
 
@@ -71,7 +71,7 @@ Semua rekomendasi pada kolom terakhir adalah **inferensi untuk pembahasan**, bel
 
 ## Batas sebelum putusan dan contoh kebocoran target
 
-Kontrak waktu yang dipakai untuk usulan minimal ialah **dakwaan dan fakta yang relevan sudah diketahui, hasil putusan belum diketahui**. Ini asumsi operasional untuk dibahas di keputusan #12. Catatan ini tidak menyatakan seluruh pernyataan dalam putusan historis sudah tersedia pada waktu itu.
+Kontrak waktu yang dipakai untuk usulan minimal ialah **dakwaan dan fakta yang relevan sudah diketahui, hasil putusan belum diketahui**. Ini asumsi operasional untuk dibahas dalam [Tentukan representasi fakta perkara dan metode Retrieve?Reuse](https://github.com/mfaishalif/sistem-cbr-estimasi-lama-hukuman-pidana/issues/12). Catatan ini tidak menyatakan seluruh pernyataan dalam putusan historis sudah tersedia pada waktu itu.
 
 1. **`fakta` dapat memuat durasi yang dijatuhkan.** Pada [s09], akhir `fakta` memuat pembuktian unsur, keadaan memberatkan/meringankan, lalu amar penjara lima tahun; `amar_putusan` justru dimulai dengan penetapan pengurangan penahanan. Menghapus elemen `amar_putusan` saja masih meninggalkan target dalam input. Pada [s10] `fakta` memuat kesimpulan terbukti dan pertimbangan hakim. Contoh s09 juga memperlihatkan label umum tidak cukup membuktikan masuk cakupan proyek.
 2. **`fakta_hukum` adalah sintesis pengadilan dan dapat menyatu dengan pertimbangan.** Pada [s16] bagian ini berakhir dengan keadaan memberatkan/meringankan dan pasal yang dipakai; pada [s26] mencakup penilaian sebelum menjatuhkan pidana. Informasi peristiwa yang muncul di situ hanya layak diambil kembali bila ada sumber pra-putusan yang dapat dipisahkan, bukan karena nama tag mengandung “fakta”.
@@ -88,9 +88,9 @@ Sebelum memasukkan satu kasus historis, tetap perlu memastikan cakupan pidana um
 
 Nilai **hilang/tidak disebut**, **belum diketahui sebelum putusan**, **secara eksplisit tidak ada**, dan **dibantah/tidak terbukti menurut putusan** mempunyai arti berbeda. Tidak ada tag `identitas` bukan bukti umur hilang; tidak ada kata senjata bukan bukti tanpa senjata; tidak disebut pernah dihukum bukan bukti belum pernah. Tidak terbukti merupakan hasil penilaian pengadilan, bukan pengganti nilai negatif pra-putusan.
 
-Target proyek tetap **lama hukuman penjara dalam hari**, terpisah dari input. [Artikel primer bagian 4.3](https://www.mdpi.com/2073-431X/11/6/88) menggunakan 30 hari/bulan dan 360 hari/tahun. Pada [s01], amar 2 tahun 3 bulan sesuai metadata 810 hari; [s12], 4 bulan sesuai 120 hari. Ini pemeriksaan contoh, bukan validasi label seluruh sampel/korpus. Jangan mengurangkan masa tahanan atau menambahkan pidana pengganti denda sebagai lama penjara utama. Penetapan aturan konversi dan penanganan hasil ambigu masih perlu keputusan tersendiri.
+Target proyek tetap **lama hukuman penjara dalam hari**, terpisah dari input. [Artikel primer bagian 4.3](https://www.mdpi.com/2073-431X/11/6/88) menggunakan 30 hari/bulan dan 360 hari/tahun. Pada [s01], amar 2 tahun 3 bulan sesuai metadata 810 hari; [s12], 4 bulan sesuai 120 hari. Ini pemeriksaan contoh, bukan validasi label seluruh sampel/korpus. Jangan mengurangkan masa tahanan atau menambahkan pidana pengganti denda sebagai lama penjara utama. Konversi 1 tahun = 360 hari dan 1 bulan = 30 hari, serta melewati kasus ambigu, sudah ditetapkan dalam [resolusi Tetapkan cakupan perkara dan unit kasus](https://github.com/mfaishalif/sistem-cbr-estimasi-lama-hukuman-pidana/issues/6#issuecomment-6961860825); riset ini mengikuti keputusan tersebut.
 
-Belum dilakukan preprocessing, pemilihan model/similarity, pengujian akurasi ekstraksi, validasi PDF, atau audit korpus. Hasil ini cukup untuk menyusun pilihan input yang konkret dalam #12; belum menetapkan pilihan pengguna.
+Belum dilakukan preprocessing, pemilihan model/similarity, pengujian akurasi ekstraksi, validasi PDF, atau audit korpus. Hasil ini cukup untuk menyusun pilihan input yang konkret dalam [Tentukan representasi fakta perkara dan metode Retrieve?Reuse](https://github.com/mfaishalif/sistem-cbr-estimasi-lama-hukuman-pidana/issues/12); belum menetapkan pilihan pengguna.
 
 ## Lampiran: manifest path sampel
 
