@@ -20,6 +20,44 @@ export class ValidationError extends Error {
   }
 }
 
+export interface SourceDocumentInput {
+  id: string;
+  contentHash: string;
+  normalizedContentHash?: string | null;
+  snapshotPath: string;
+  sourceUrl?: string | null;
+  retrievedAt?: string | null;
+}
+
+export interface SourceDocumentRecord {
+  id: string;
+  copyOfExisting: boolean;
+}
+
+export interface SourceAliasInput {
+  id: string;
+  sourceDocumentId: string;
+  aliasType: 'path' | 'xml_id' | 'url' | 'other';
+  aliasValue: string;
+}
+
+export interface SourceAliasRecord {
+  inserted: boolean;
+  conflict: boolean;
+  existingSourceDocumentId: string | null;
+}
+
+export interface CaseUnitSourceInput {
+  caseUnitId: string;
+  sourceDocumentId: string;
+  narrationLocation?: string | null;
+  outcomeLocation?: string | null;
+  notes?: string | null;
+  sourceOutcomeValue?: string | null;
+  sourceOutcomeUnit?: string | null;
+  sourceOutcomeKind?: 'metadata' | 'metadata-and-verdict' | null;
+}
+
 interface CaseUnitRow {
   id: string;
   case_group_id: string;
@@ -247,7 +285,9 @@ export function createCaseUnit(
   const unitId = idFactory();
   let caseGroupId = draft.caseGroupId?.trim() || null;
 
-  db.exec('BEGIN IMMEDIATE');
+  // A savepoint allows bulk imports to wrap many createCaseUnit calls in one
+  // transaction while keeping this function usable on its own.
+  db.exec('SAVEPOINT create_case_unit');
   try {
     if (caseGroupId !== null) {
       const group = db
@@ -304,13 +344,152 @@ export function createCaseUnit(
       insertFactAttribute(db, unitId, attribute.key, attribute.value);
     }
 
-    db.exec('COMMIT');
+    db.exec('RELEASE create_case_unit');
   } catch (error) {
-    db.exec('ROLLBACK');
+    db.exec('ROLLBACK TO create_case_unit');
+    db.exec('RELEASE create_case_unit');
     throw error;
   }
 
   return unitId;
+}
+
+/** Run a callback inside one immediate transaction. */
+export function withTransaction<T>(db: DatabaseSync, callback: () => T): T {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const result = callback();
+    db.exec('COMMIT');
+    return result;
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+}
+
+/**
+ * Insert a canonical source document. Byte-identical documents and documents
+ * that match after format normalization share one canonical row; callers keep
+ * every path/ID/URL alias through insertSourceAlias.
+ */
+export function insertSourceDocument(
+  db: DatabaseSync,
+  input: SourceDocumentInput,
+): SourceDocumentRecord {
+  const contentHash = requireText(input.contentHash, 'sourceDocument.contentHash');
+  const snapshotPath = requireText(input.snapshotPath, 'sourceDocument.snapshotPath');
+  const normalizedContentHash = input.normalizedContentHash?.trim() || null;
+
+  const byContentHash = db
+    .prepare('SELECT id FROM source_document WHERE content_hash = ?')
+    .get(contentHash) as { id: string } | undefined;
+
+  if (byContentHash !== undefined) {
+    return { id: byContentHash.id, copyOfExisting: true };
+  }
+
+  if (normalizedContentHash !== null) {
+    const byNormalizedHash = db
+      .prepare('SELECT id FROM source_document WHERE normalized_content_hash = ?')
+      .get(normalizedContentHash) as { id: string } | undefined;
+
+    if (byNormalizedHash !== undefined) {
+      return { id: byNormalizedHash.id, copyOfExisting: true };
+    }
+  }
+
+  db.prepare(
+    `INSERT INTO source_document
+       (id, content_hash, normalized_content_hash, snapshot_path, source_url, retrieved_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(
+    requireText(input.id, 'sourceDocument.id'),
+    contentHash,
+    normalizedContentHash,
+    snapshotPath,
+    input.sourceUrl?.trim() || null,
+    input.retrievedAt?.trim() || null,
+  );
+
+  return { id: input.id, copyOfExisting: false };
+}
+
+/** Record one source identity without silently repointing an existing alias. */
+export function insertSourceAlias(db: DatabaseSync, input: SourceAliasInput): SourceAliasRecord {
+  const aliasValue = requireText(input.aliasValue, 'sourceAlias.aliasValue');
+  const existing = db
+    .prepare('SELECT source_document_id FROM source_alias WHERE alias_type = ? AND alias_value = ?')
+    .get(input.aliasType, aliasValue) as { source_document_id: string } | undefined;
+
+  if (existing !== undefined) {
+    return {
+      inserted: false,
+      conflict: existing.source_document_id !== input.sourceDocumentId,
+      existingSourceDocumentId: existing.source_document_id,
+    };
+  }
+
+  db.prepare(
+    `INSERT INTO source_alias (id, source_document_id, alias_type, alias_value)
+     VALUES (?, ?, ?, ?)`,
+  ).run(
+    requireText(input.id, 'sourceAlias.id'),
+    requireText(input.sourceDocumentId, 'sourceAlias.sourceDocumentId'),
+    input.aliasType,
+    aliasValue,
+  );
+
+  return { inserted: true, conflict: false, existingSourceDocumentId: null };
+}
+
+/** Create a case group with a caller-supplied stable ID when it does not exist. */
+export function ensureCaseGroup(db: DatabaseSync, id: string, label?: string | null): void {
+  db.prepare('INSERT OR IGNORE INTO case_group (id, label) VALUES (?, ?)').run(
+    requireText(id, 'caseGroup.id'),
+    label?.trim() || null,
+  );
+}
+
+/** Link a case unit to the source document and locations that support it. */
+export function linkCaseUnitSource(db: DatabaseSync, input: CaseUnitSourceInput): void {
+  db.prepare(
+    `INSERT INTO case_unit_source
+       (case_unit_id, source_document_id, narration_location, outcome_location, notes,
+        source_outcome_value, source_outcome_unit, source_outcome_kind)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (case_unit_id, source_document_id) DO UPDATE SET
+       narration_location = excluded.narration_location,
+       outcome_location = excluded.outcome_location,
+       notes = excluded.notes,
+       source_outcome_value = excluded.source_outcome_value,
+       source_outcome_unit = excluded.source_outcome_unit,
+       source_outcome_kind = excluded.source_outcome_kind`,
+  ).run(
+    requireText(input.caseUnitId, 'caseUnitSource.caseUnitId'),
+    requireText(input.sourceDocumentId, 'caseUnitSource.sourceDocumentId'),
+    input.narrationLocation?.trim() || null,
+    input.outcomeLocation?.trim() || null,
+    input.notes?.trim() || null,
+    input.sourceOutcomeValue?.trim() || null,
+    input.sourceOutcomeUnit?.trim() || null,
+    input.sourceOutcomeKind ?? null,
+  );
+}
+
+/**
+ * Remove the whole imported case base before a replace import. Application
+ * configuration is intentionally kept: it is not part of the imported data.
+ */
+export function clearCaseBase(db: DatabaseSync): void {
+  db.exec(`
+    DELETE FROM case_unit_source;
+    DELETE FROM case_article;
+    DELETE FROM case_fact_attribute;
+    DELETE FROM case_unit;
+    DELETE FROM case_group;
+    DELETE FROM source_alias;
+    DELETE FROM source_document;
+  `);
 }
 
 function rowToArticle(row: CaseArticleRow): CaseArticle {
@@ -443,11 +622,27 @@ export function getCaseBaseGeneration(db: DatabaseSync): CaseBaseGeneration {
   return { generation: row.generation, updatedAt: row.updated_at };
 }
 
+function countSourceDocuments(db: DatabaseSync): number {
+  const row = db.prepare('SELECT COUNT(*) AS count FROM source_document').get() as {
+    count: number;
+  };
+  return row.count;
+}
+
+function countSourceAliases(db: DatabaseSync): number {
+  const row = db.prepare('SELECT COUNT(*) AS count FROM source_alias').get() as {
+    count: number;
+  };
+  return row.count;
+}
+
 export function getDatabaseStatus(db: DatabaseSync): DatabaseStatus {
   return {
     schemaVersion: getSchemaVersion(db),
     caseUnits: countCaseUnits(db),
     caseGroups: countCaseGroups(db),
+    sourceDocuments: countSourceDocuments(db),
+    sourceAliases: countSourceAliases(db),
     generation: getCaseBaseGeneration(db).generation,
   };
 }

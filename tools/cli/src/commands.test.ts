@@ -4,7 +4,6 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
-  readdirSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -54,8 +53,8 @@ describe('cli', () => {
     expect(migrate.code).toBe(0);
     expect(JSON.parse(migrate.stdout)).toMatchObject({
       database,
-      applied: ['001'],
-      schemaVersion: '001',
+      applied: ['001', '002'],
+      schemaVersion: '002',
     });
     expect(existsSync(database)).toBe(true);
 
@@ -64,7 +63,7 @@ describe('cli', () => {
     expect(JSON.parse(status.stdout)).toMatchObject({
       database,
       exists: true,
-      schemaVersion: '001',
+      schemaVersion: '002',
       caseUnits: 0,
       caseGroups: 0,
       generation: 0,
@@ -124,21 +123,34 @@ describe('cli', () => {
     ).toBe(before);
   });
 
-  it('refuses to import and writes nothing', () => {
+  it('imports a snapshot and writes a report', () => {
     const sources = join(directory, 'sources');
-    mkdirSync(sources);
-    const imported = run([
-      'import',
-      '--source',
-      sources,
-      '--database',
-      join(directory, 'app.db'),
-    ]);
+    const dataset = join(sources, 'dataset');
+    mkdirSync(dataset, { recursive: true });
+    writeFileSync(
+      join(dataset, 'case.xml'),
+      `<?xml version="1.0" encoding="UTF-8"?>
+<putusan amar="pidana" amar_lainnya="hukum" id="case-cli" klasifikasi="pidana-umum" lama_hukuman="180" lembaga_peradilan="pn-contoh" provinsi="jabar" status="berkekuatan-hukum-tetap" sub_klasifikasi="pencurian" url="https://example.invalid/case-cli">
+<kepala_putusan>putusan nomor 7 pid b 2024 pn contoh demi keadilan berdasarkan ketuhanan yang maha esa pengadilan negeri contoh yang mengadili perkara pidana dalam tingkat pertama menjatuhkan putusan sebagai berikut dalam perkara terdakwa</kepala_putusan>
+<identitas>nama lengkap budi bin ahmad umur tanggal lahir 30 tahun 10 maret 1994 jenis kelamin laki laki pekerjaan swasta terdakwa ditahan sejak tanggal 20 mei 2024</identitas>
+<riwayat_dakwaan>bahwa ia terdakwa budi bin ahmad pada hari senin tanggal 13 mei 2024 mengambil sepeda motor milik korban sebagaimana diatur dan diancam pidana dalam pasal 362 kuhp</riwayat_dakwaan>
+<fakta>menimbang bahwa keterangan saksi menerangkan perbuatan terdakwa</fakta>
+<amar_putusan>menyatakan terdakwa budi bin ahmad terbukti bersalah menjatuhkan pidana dengan pidana penjara selama 6 enam bulan</amar_putusan>
+</putusan>`,
+      'utf8',
+    );
 
-    expect(imported.code).toBe(2);
-    expect(imported.stderr).toContain('belum diimplementasikan');
-    expect(existsSync(join(directory, 'app.db'))).toBe(false);
-    expect(readdirSync(sources)).toEqual([]);
+    const database = join(directory, 'app.db');
+    const imported = run(['import', '--source', sources, '--database', database]);
+
+    expect(imported.code).toBe(0);
+    const output = JSON.parse(imported.stdout) as {
+      counts: { casesAccepted: number };
+      reportPath: string;
+    };
+    expect(output.counts.casesAccepted).toBe(1);
+    expect(existsSync(output.reportPath)).toBe(true);
+    expect(existsSync(database)).toBe(true);
   });
 
   it('validates that the import source exists', () => {

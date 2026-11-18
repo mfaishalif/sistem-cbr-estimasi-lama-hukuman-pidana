@@ -168,11 +168,32 @@ INSERT INTO case_base_generation (id, generation) VALUES (1, 0);
 ${generationTriggers()}
 `;
 
+/**
+ * Import provenance for the outcome. `actual_sentence_days` stays the single
+ * normalized target, while the raw duration expression and the kind of source
+ * that supported it remain traceable. These columns are provenance only and
+ * therefore do not advance the case base generation.
+ */
+const importOutcomeProvenance = `
+ALTER TABLE case_unit_source ADD COLUMN source_outcome_value TEXT;
+ALTER TABLE case_unit_source ADD COLUMN source_outcome_unit TEXT;
+ALTER TABLE case_unit_source ADD COLUMN source_outcome_kind TEXT
+  CHECK (
+    source_outcome_kind IS NULL
+    OR source_outcome_kind IN ('metadata', 'metadata-and-verdict')
+  );
+`;
+
 export const migrations: Migration[] = [
   {
     id: '001',
     name: 'initial-case-base',
     sql: initialSchema,
+  },
+  {
+    id: '002',
+    name: 'import-outcome-provenance',
+    sql: importOutcomeProvenance,
   },
 ];
 

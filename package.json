@@ -13,17 +13,18 @@
   },
   "scripts": {
     "build": "npm run build:packages && npm run build:web && npm run build:api",
-    "build:packages": "tsc -b packages/cbr packages/data tools/cli",
+    "build:packages": "tsc -b packages/cbr packages/data tools/importer tools/cli",
     "build:api": "tsc -b apps/api",
     "build:web": "npm run build --workspace @cbr/web",
-    "typecheck": "tsc -b packages/cbr packages/data tools/cli apps/api --pretty && npm run typecheck --workspace @cbr/web",
+    "typecheck": "tsc -b packages/cbr packages/data tools/importer tools/cli apps/api --pretty && npm run typecheck --workspace @cbr/web",
     "test": "vitest run",
     "test:watch": "vitest",
     "dev:web": "npm run dev --workspace @cbr/web",
     "dev:api": "npm run build && node --watch apps/api/dist/main.js",
     "start": "node apps/api/dist/main.js",
     "db:migrate": "npm run build:packages && node tools/cli/dist/index.js migrate",
-    "db:status": "npm run build:packages && node tools/cli/dist/index.js status"
+    "db:status": "npm run build:packages && node tools/cli/dist/index.js status",
+    "source:acquire": "npm run build:packages && node tools/importer/dist/acquire-cli.js"
   },
   "devDependencies": {
     "@types/node": "24.19.2",

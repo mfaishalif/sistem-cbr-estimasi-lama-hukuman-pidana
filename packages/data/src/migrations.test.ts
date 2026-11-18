@@ -23,9 +23,9 @@ describe('migrations', () => {
   it('applies the initial schema to an empty database', () => {
     const result = runMigrations(db);
 
-    expect(result.applied).toEqual(['001']);
-    expect(result.schemaVersion).toBe('001');
-    expect(getSchemaVersion(db)).toBe('001');
+    expect(result.applied).toEqual(['001', '002']);
+    expect(result.schemaVersion).toBe('002');
+    expect(getSchemaVersion(db)).toBe('002');
   });
 
   it('is idempotent', () => {
@@ -33,7 +33,7 @@ describe('migrations', () => {
     const secondRun = runMigrations(db);
 
     expect(secondRun.applied).toEqual([]);
-    expect(secondRun.schemaVersion).toBe('001');
+    expect(secondRun.schemaVersion).toBe('002');
   });
 
   it('creates the agreed tables and no audit/version-history tables', () => {
@@ -135,6 +135,6 @@ describe('migrations', () => {
 
     expect(result.applied).toEqual(['001', '002']);
     expect(result.schemaVersion).toBe('002');
-    expect(migrations).toHaveLength(1);
+    expect(migrations).toHaveLength(2);
   });
 });

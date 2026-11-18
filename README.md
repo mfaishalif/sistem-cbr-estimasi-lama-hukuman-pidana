@@ -3,10 +3,13 @@
 Aplikasi tugas kuliah untuk mengestimasi lama hukuman pidana dengan penalaran
 berbasis kasus (CBR) atas pengalaman putusan pengadilan Indonesia.
 
-Tiket fondasi ini membangun **struktur aplikasi, skema SQLite, CLI, dan Docker**.
-Impor basis kasus, mesin Retrieve–Reuse, integrasi CRUD/4R, dan evaluasi akhir
-belum diimplementasikan. Antarmuka menampilkan status sistem dan menandai tahap
-4R sebagai belum tersedia; tidak ada angka estimasi yang diklaim dihasilkan.
+Fondasi aplikasi menyediakan **struktur aplikasi, skema SQLite, CLI, dan Docker**.
+Impor dan normalisasi basis kasus Indo-Law sudah diimplementasikan: perintah
+`import` menghasilkan unit terdakwa–perkara, sumber/alias/hash, hasil aktual
+dalam hari, pasal dakwaan, atribut opsional, kelompok perkara, serta laporan
+kelolosan. Mesin Retrieve–Reuse, integrasi CRUD/4R, dan evaluasi akhir belum
+diimplementasikan; antarmuka masih menandai tahap 4R sebagai belum tersedia dan
+tidak mengklaim angka estimasi.
 
 ## Prasyarat
 
@@ -40,6 +43,7 @@ bila Anda menjalankan `down -v` atau menghapus volume sendiri.
 | --- | --- | --- |
 | Database aplikasi | volume Docker `cbr-estimasi-lama-hukuman_app-data`, file `/data/app.db` | Persisten setelah container dibuat ulang; tidak masuk Git/image. |
 | Sumber mentah | `./data/raw` di host, dipasang `/sources` **read-only** | Diisi terpisah dari build image; tidak masuk Git/image. |
+| Laporan impor | `./artifacts/import/import-report.json` di host | Ringkasan jumlah, alasan dilewati, kategori, kelengkapan atribut, dan waktu. Tidak memuat isi narasi. |
 | Workspace evaluasi | `./data/evaluation` di host, dipasang `/workspace` | Database evaluasi sendiri (`evaluation.db`), terpisah dari database aplikasi. |
 | Artefak evaluasi | `./artifacts/evaluation` di host, dipasang `/artifacts` | Ekspor laporan/artefak agar dapat dibaca dan dijalankan ulang. |
 
@@ -54,7 +58,7 @@ Sebelum menjalankan perintah impor/evaluasi pertama kali, buat folder host agar
 container non-root dapat menulisnya:
 
 ```bash
-mkdir -p data/raw data/evaluation artifacts/evaluation
+mkdir -p data/raw data/evaluation artifacts/evaluation artifacts/import
 ```
 
 Pada Linux native, pastikan folder tersebut dapat ditulis oleh uid container
@@ -92,8 +96,10 @@ docker compose run --rm --entrypoint node app \
 
 Migrasi pertama membuat skema awal: unit kasus (terdakwa–perkara), kelompok
 perkara, sumber/alias/snapshot/hash/lokasi bukti, pasal dakwaan, atribut fakta
-opsional, hasil aktual, konfigurasi, dan penanda generasi basis kasus. Tidak ada
-audit log atau riwayat versi kasus.
+opsional, hasil aktual, konfigurasi, dan penanda generasi basis kasus. Migrasi
+`002` menambahkan provenance hasil impor pada penghubung unit–sumber: ekspresi
+durasi sumber dan jenis dukungannya (metadata saja atau metadata yang cocok
+dengan teks putusan). Tidak ada audit log atau riwayat versi kasus.
 
 ## CLI
 
@@ -139,30 +145,67 @@ Semantik nilai:
 ## Impor dan evaluasi
 
 Perintah memakai image yang sama dan tidak berjalan pada startup aplikasi biasa.
+Impor **mengganti** basis kasus (bukan menambahkan duplikat), mempertahankan
+konfigurasi aplikasi, dan harus dijalankan saat aplikasi berhenti. Sumber mentah
+dipasang read-only; isi dataset tidak ditulis ke laporan atau repo.
+
+### 1. Akuisisi snapshot resmi (di host)
 
 ```bash
-# Siapkan sumber mentah di host (tidak masuk Git/image)
-mkdir -p data/raw
+npm ci
+npm run build:packages
+npm run source:acquire -- --destination data/raw/indo-law
+```
 
+Perintah mengunduh arsip resmi pada commit tetap
+`67340338adbc63021630947d905627eef0d7e43f`, mengekstraknya, lalu menulis
+`manifest.json` berisi SHA-256 arsip dan setiap XML. Prasyarat ekstraksi: `tar`
+(Windows) atau `unzip` (Linux/macOS). Gunakan `--archive <path>` untuk memakai
+ZIP yang sudah diunduh dan `--force` untuk mengulang ekstraksi.
+
+### 2. Impor basis kasus
+
+```bash
 # Hentikan aplikasi sebelum impor besar
 docker compose stop app
 
-# Impor (belum diimplementasikan pada tiket fondasi; keluar dengan kode 2
-# dan tidak menulis apa pun)
+# Snapshot ada di ./data/raw/indo-law; laporan ke ./artifacts/import
 docker compose --profile tools run --rm import
+```
 
-# Workspace evaluasi terpisah (menyiapkan database evaluasi + manifest;
-# pipeline evaluasi belum diimplementasikan)
+Tanpa Docker:
+
+```bash
+node tools/cli/dist/index.js import \
+  --source data/raw/indo-law \
+  --database data/app.db \
+  --report artifacts/import/import-report.json
+```
+
+Pemeriksaan cepat pada sebagian XML memakai `--limit <n>`. Laporan berisi jumlah
+dokumen diterima/dilewati beserta alasannya, kategori yang lolos, kelengkapan
+atribut, hasil aktual menurut jenis dukungan, salinan/kelompok/konflik, ukuran
+dan waktu pemrosesan. Laporan tidak memuat narasi, nama, atau nomor perkara.
+
+Rincian aturan ekstraksi, hasil uji snapshot penuh, dan batasnya:
+[`docs/import/indo-law-import.md`](docs/import/indo-law-import.md).
+
+### 3. Workspace evaluasi
+
+```bash
 docker compose --profile tools run --rm evaluate
 ```
 
- Batas yang sudah disiapkan:
+Evaluasi menyiapkan database evaluasi sendiri dan manifest di
+`artifacts/evaluation`; pipeline evaluasi CBR belum diimplementasikan.
+
+Batas yang sudah disiapkan:
 
 - Sumber mentah dipasang read-only; impor besar hanya saat aplikasi berhenti.
 - Evaluasi tidak memasang volume database aplikasi dan memakai
   `data/evaluation/evaluation.db` sendiri.
 - Sumber mentah dipasang read-only pada layanan impor dan evaluasi.
-- Artefak ditulis ke `artifacts/evaluation`, bukan ke volume aplikasi.
+- Artefak impor/evaluasi ditulis ke `artifacts/`, bukan ke volume aplikasi.
 - Pengambilan dataset bukan bagian dari build image.
 
 Pemeriksaan isolasi mount (aplikasi harus sedang berjalan):
@@ -180,7 +223,7 @@ Skrip membandingkan hash `/data/app.db` sebelum/sesudah evaluasi dan memastikan
 ```bash
 npm ci
 npm run build          # paket bersama, API, dan frontend
-npm test               # unit test data layer, CLI, dan isolasi paket CBR
+npm test               # unit test data layer, CLI, importer, dan isolasi paket CBR
 
 # API + frontend hasil build pada http://localhost:3000
 DATABASE_PATH=./data/app.db WEB_DIST_DIR=./apps/web/dist npm start
@@ -203,6 +246,7 @@ apps/web        React + Vite + shadcn/ui (token visual dari design.md)
 apps/api        NestJS: HTTP /api, menyajikan build frontend
 packages/cbr    Model domain dan kontrak bersama; tanpa HTTP/browser/filesystem
 packages/data   Akses SQLite, migrasi, repository
+tools/importer  Akuisisi snapshot, parsing XML, ekstraksi, normalisasi, laporan impor
 tools/cli       Migrasi, status, create-case, impor, workspace evaluasi
 docker/         Entrypoint image
 scripts/        Pemeriksaan operasional
@@ -214,15 +258,18 @@ tanpa bergantung pada browser atau NestJS. Indeks TF-IDF adalah turunan basis
 kasus: setiap perubahan unit/atribut/pasal/konfigurasi menaikkan generasi basis
 kasus sehingga indeks lama tidak boleh dipakai.
 
-## Pemeriksaan tiket fondasi
+## Pemeriksaan
 
 1. `npm ci && npm run typecheck && npm test && npm run build`
 2. `docker compose up --build`, lalu buka `http://localhost:3000` dan
    `http://localhost:3000/api/health`.
 3. Migrasi database kosong: hapus volume **hanya untuk pemeriksaan** dengan
    `docker compose down -v`, lalu `docker compose up --build`; status skema
-   harus `001`.
+   harus `002`.
 4. Persistensi: tambahkan unit kasus sintetis melalui `create-case`, lalu
    `docker compose up -d --force-recreate`; jumlah unit harus tetap.
-5. Isolasi mount: jalankan `node scripts/verify-mount-isolation.mjs` dan
+5. Impor: jalankan `source:acquire`, hentikan aplikasi, jalankan layanan
+   `import`, lalu periksa `artifacts/import/import-report.json`. Jalankan ulang
+   impor dan pastikan jumlah unit tidak bertambah dua kali.
+6. Isolasi mount: jalankan `node scripts/verify-mount-isolation.mjs` dan
    pastikan hash database aplikasi tidak berubah.
