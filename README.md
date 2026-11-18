@@ -7,9 +7,13 @@ Fondasi aplikasi menyediakan **struktur aplikasi, skema SQLite, CLI, dan Docker*
 Impor dan normalisasi basis kasus Indo-Law sudah diimplementasikan: perintah
 `import` menghasilkan unit terdakwa–perkara, sumber/alias/hash, hasil aktual
 dalam hari, pasal dakwaan, atribut opsional, kelompok perkara, serta laporan
-kelolosan. Mesin Retrieve–Reuse, integrasi CRUD/4R, dan evaluasi akhir belum
-diimplementasikan; antarmuka masih menandai tahap 4R sebagai belum tersedia dan
-tidak mengklaim angka estimasi.
+kelolosan. Mesin Retrieve–Reuse bersama juga sudah tersedia di `packages/cbr`
+dengan indeks TF-IDF, atribut opsional berbobot, penahanan estimasi yang
+terjelaskan, dan siklus rebuild yang tidak memakai indeks basi. Integrasi CRUD/4R
+ke API dan UI serta pipeline evaluasi akhir belum diimplementasikan; antarmuka
+masih menandai tahap 4R sebagai belum tersedia dan tidak mengklaim angka
+estimasi. Rincian mesin dan benchmark kecepatan:
+[`docs/cbr/retrieve-reuse.md`](docs/cbr/retrieve-reuse.md).
 
 ## Prasyarat
 
@@ -44,6 +48,7 @@ bila Anda menjalankan `down -v` atau menghapus volume sendiri.
 | Database aplikasi | volume Docker `cbr-estimasi-lama-hukuman_app-data`, file `/data/app.db` | Persisten setelah container dibuat ulang; tidak masuk Git/image. |
 | Sumber mentah | `./data/raw` di host, dipasang `/sources` **read-only** | Diisi terpisah dari build image; tidak masuk Git/image. |
 | Laporan impor | `./artifacts/import/import-report.json` di host | Ringkasan jumlah, alasan dilewati, kategori, kelengkapan atribut, dan waktu. Tidak memuat isi narasi. |
+| Laporan benchmark | `./artifacts/benchmark/retrieve-reuse.json` di host | Fase startup/rebuild, distribusi latensi pencarian, RAM proses, mesin, data, dan konfigurasi. Tidak memuat narasi. |
 | Workspace evaluasi | `./data/evaluation` di host, dipasang `/workspace` | Database evaluasi sendiri (`evaluation.db`), terpisah dari database aplikasi. |
 | Artefak evaluasi | `./artifacts/evaluation` di host, dipasang `/artifacts` | Ekspor laporan/artefak agar dapat dibaca dan dijalankan ulang. |
 
@@ -58,7 +63,7 @@ Sebelum menjalankan perintah impor/evaluasi pertama kali, buat folder host agar
 container non-root dapat menulisnya:
 
 ```bash
-mkdir -p data/raw data/evaluation artifacts/evaluation artifacts/import
+mkdir -p data/raw data/evaluation artifacts/evaluation artifacts/import artifacts/benchmark
 ```
 
 Pada Linux native, pastikan folder tersebut dapat ditulis oleh uid container
@@ -141,6 +146,36 @@ Semantik nilai:
   `prior_conviction: "no"`.
 - `actualSentenceDays` adalah hasil aktual putusan, bukan estimasi. Tidak ada
   kolom estimasi pada tabel unit kasus.
+
+### Benchmark mesin Retrieve–Reuse
+
+Setelah basis kasus diimpor, ukur kecepatan dengan indeks siap:
+
+```bash
+docker compose run --rm --entrypoint node app \
+  tools/cli/dist/index.js benchmark \
+  --database /data/app.db \
+  --queries 500 \
+  --warmup 20 \
+  --report /artifacts/benchmark/retrieve-reuse.json
+```
+
+Atau tanpa Docker:
+
+```bash
+node tools/cli/dist/index.js benchmark \
+  --database data/app.db \
+  --queries 500 \
+  --warmup 20 \
+  --report artifacts/benchmark/retrieve-reuse.json
+```
+
+Laporan memisahkan pembacaan snapshot dan pembangunan indeks dari latensi
+pencarian, lalu mencatat mesin, ukuran data, fingerprint konfigurasi, distribusi
+latensi, dan snapshot RAM. Target tiket adalah pencarian ≤ 2 detik; laporan
+menyatakan apakah target terpenuhi untuk data yang benar-benar diukur. Angka
+kecepatan bukan klaim akurasi estimasi. Rincian hasil pengukuran subset impor
+penuh ada di [`docs/cbr/retrieve-reuse.md`](docs/cbr/retrieve-reuse.md).
 
 ## Impor dan evaluasi
 
@@ -269,19 +304,20 @@ sebelum `npm start`.
 ```text
 apps/web        React + Vite + shadcn/ui (token visual dari design.md)
 apps/api        NestJS: HTTP /api, menyajikan build frontend
-packages/cbr    Model domain dan kontrak bersama; tanpa HTTP/browser/filesystem
-packages/data   Akses SQLite, migrasi, repository
+packages/cbr    Mesin Retrieve–Reuse: model, kontrak, TF-IDF, atribut, indeks, reuse
+packages/data   Akses SQLite, migrasi, repository, adapter snapshot CBR
 tools/importer  Akuisisi snapshot, parsing XML, ekstraksi, normalisasi, laporan impor
-tools/cli       Migrasi, status, create-case, impor, workspace evaluasi
+tools/cli       Migrasi, status, create-case, impor, benchmark, workspace evaluasi
 docker/         Entrypoint image
 scripts/        Pemeriksaan operasional
 ```
 
-Batas tanggung jawab: API, impor, dan evaluasi memakai implementasi bersama;
-mesin CBR nantinya menerima fakta, konfigurasi, dan data indeks dari pemanggil
+Batas tanggung jawab: API, impor, evaluasi, dan benchmark memakai implementasi
+bersama. Mesin CBR menerima fakta, konfigurasi, dan snapshot dari pemanggil
 tanpa bergantung pada browser atau NestJS. Indeks TF-IDF adalah turunan basis
 kasus: setiap perubahan unit/atribut/pasal/konfigurasi menaikkan generasi basis
-kasus sehingga indeks lama tidak boleh dipakai.
+kasus sehingga indeks lama tidak boleh dipakai. Selama rebuild, indeks lama
+dilepas; bila build gagal, estimasi ditahan, bukan diisi dengan hasil basi.
 
 ## Pemeriksaan
 
@@ -296,5 +332,7 @@ kasus sehingga indeks lama tidak boleh dipakai.
 5. Impor: jalankan `source:acquire`, hentikan aplikasi, jalankan layanan
    `import`, lalu periksa `artifacts/import/import-report.json`. Jalankan ulang
    impor dan pastikan jumlah unit tidak bertambah dua kali.
-6. Isolasi mount: jalankan `node scripts/verify-mount-isolation.mjs` dan
+6. Benchmark: jalankan perintah `benchmark` pada database hasil impor dan
+   pastikan laporan memisahkan fase startup/rebuild dari latensi pencarian.
+7. Isolasi mount: jalankan `node scripts/verify-mount-isolation.mjs` dan
    pastikan hash database aplikasi tidak berubah.

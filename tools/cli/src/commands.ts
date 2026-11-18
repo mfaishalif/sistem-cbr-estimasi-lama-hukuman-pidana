@@ -11,6 +11,7 @@ import {
 } from '@cbr/data';
 import { runImport } from '@cbr/importer';
 import type { ParsedArgs } from './args';
+import { runBenchmark } from './benchmark';
 
 export interface CliIO {
   stdout: (line: string) => void;
@@ -29,6 +30,7 @@ Perintah:
   status        Tampilkan versi skema, jumlah unit kasus, dan generasi basis kasus.
   create-case   Tambah satu unit kasus dari JSON (--file <path> atau --json <json>).
   import        Impor dan normalisasi basis kasus dari snapshot sumber (--source <dir>).
+  benchmark     Ukur latensi Retrieve-Reuse, pembangunan indeks, dan RAM.
   evaluate      Siapkan workspace evaluasi terpisah (pipeline evaluasi belum diimplementasikan).
   help          Tampilkan bantuan ini.
 
@@ -40,11 +42,17 @@ Opsi impor:
   --report <path>     Lokasi laporan JSON. Default: <folder database>/import-report.json.
   --limit <n>         Batasi jumlah XML yang diproses (untuk pemeriksaan).
 
+Opsi benchmark:
+  --queries <n>       Jumlah kasus uji yang disebar merata. Default: 200.
+  --warmup <n>        Pencarian pemanasan yang tidak diukur. Default: 5.
+  --report <path>     Tulis laporan benchmark ke JSON.
+
 Contoh:
   cbr migrate --database /data/app.db
   cbr status --database /data/app.db
   cbr create-case --file case.json
   cbr import --source /sources/indo-law --database /data/app.db
+  cbr benchmark --database /data/app.db --queries 200 --report artifacts/benchmark.json
   cbr evaluate --workspace /workspace --artifacts /artifacts
 `;
 
@@ -175,6 +183,61 @@ function commandImport(parsed: ParsedArgs, io: CliIO, environment: CliEnvironmen
   return 0;
 }
 
+function integerOption(
+  value: string | undefined,
+  label: string,
+  min: number,
+): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < min) {
+    throw new Error(`${label} harus bilangan bulat ${min === 0 ? 'nol atau positif' : 'positif'}.`);
+  }
+  return parsed;
+}
+
+function commandBenchmark(
+  parsed: ParsedArgs,
+  io: CliIO,
+  environment: CliEnvironment,
+): number {
+  const database = databasePath(parsed, environment);
+  if (!existsSync(database)) {
+    io.stderr(`Basis data tidak ditemukan: ${database}`);
+    return 1;
+  }
+
+  let queryLimit: number | undefined;
+  let warmupCount: number | undefined;
+  try {
+    queryLimit = integerOption(parsed.flags.queries, '--queries', 1);
+    warmupCount = integerOption(parsed.flags.warmup, '--warmup', 0);
+  } catch (error) {
+    io.stderr(error instanceof Error ? error.message : String(error));
+    return 1;
+  }
+
+  const report = runBenchmark({
+    databasePath: database,
+    queryLimit,
+    warmupCount,
+  });
+
+  const reportFlag = parsed.flags.report;
+  if (reportFlag === undefined) {
+    print(io, report);
+    return 0;
+  }
+
+  const reportPath = resolve(environment.cwd, reportFlag);
+  mkdirSync(dirname(reportPath), { recursive: true });
+  writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+  print(io, { ...report, reportPath });
+  return 0;
+}
+
 function commandEvaluate(parsed: ParsedArgs, io: CliIO, environment: CliEnvironment): number {
   const workspaceFlag = parsed.flags.workspace;
   if (workspaceFlag === undefined) {
@@ -234,6 +297,8 @@ export function runCli(
         return commandCreateCase(parsed, io, environment);
       case 'import':
         return commandImport(parsed, io, environment);
+      case 'benchmark':
+        return commandBenchmark(parsed, io, environment);
       case 'evaluate':
         return commandEvaluate(parsed, io, environment);
       default:
