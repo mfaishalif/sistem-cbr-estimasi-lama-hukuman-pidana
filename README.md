@@ -7,12 +7,20 @@ Fondasi aplikasi menyediakan **struktur aplikasi, skema SQLite, CLI, dan Docker*
 Impor dan normalisasi basis kasus Indo-Law sudah diimplementasikan: perintah
 `import` menghasilkan unit terdakwa–perkara, sumber/alias/hash, hasil aktual
 dalam hari, pasal dakwaan, atribut opsional, kelompok perkara, serta laporan
-kelolosan. Mesin Retrieve–Reuse bersama juga sudah tersedia di `packages/cbr`
-dengan indeks TF-IDF, atribut opsional berbobot, penahanan estimasi yang
-terjelaskan, dan siklus rebuild yang tidak memakai indeks basi. Integrasi CRUD/4R
-ke API dan UI serta pipeline evaluasi akhir belum diimplementasikan; antarmuka
-masih menandai tahap 4R sebagai belum tersedia dan tidak mengklaim angka
-estimasi. Rincian mesin dan benchmark kecepatan:
+kelolosan. Mesin Retrieve–Reuse bersama tersedia di `packages/cbr` dengan indeks
+TF-IDF, atribut opsional berbobot, penahanan estimasi yang terjelaskan, dan
+siklus rebuild yang tidak memakai indeks basi.
+
+API NestJS dan UI React kini mendukung alur **Retrieve–Reuse–Revise–Retain**
+beserta CRUD unit kasus. Mahasiswa dapat mengisi fakta pra-putusan, melihat
+kasus referensi dan perhitungan Reuse, membandingkan hasil aktual (Revise), lalu
+menyimpan kasus beserta hasil aktual tersebut (Retain). CRUD mempertahankan
+sumber dan kelompok perkara, memisahkan fakta dari hasil aktual, dan membatalkan
+indeks lama saat data berubah. Tidak ada verifikasi ahli atau riwayat versi;
+estimasi tidak pernah disimpan sebagai hasil aktual. Konfigurasi retrieval aktif
+dibaca dari [`config/retrieval.json`](config/retrieval.json) dan ditampilkan di
+UI, bukan diubah lewat angka tersembunyi. Pipeline evaluasi akhir dan laporan
+eksperimen tetap menjadi pekerjaan lanjutan. Rincian mesin dan benchmark:
 [`docs/cbr/retrieve-reuse.md`](docs/cbr/retrieve-reuse.md).
 
 ## Prasyarat
@@ -40,6 +48,62 @@ docker compose down          # hapus container, volume data tetap
 `docker compose down -v` **menghapus volume database secara permanen**. Tidak
 ada perintah aplikasi yang menghapus data secara diam-diam; reset hanya terjadi
 bila Anda menjalankan `down -v` atau menghapus volume sendiri.
+
+## Panduan singkat: data sintetis dan alur 4R
+
+Panduan ini memakai data sintetis, bukan putusan nyata. Jangan memasukkan hasil
+estimasi sebagai hasil aktual; isi hasil aktual hanya dari putusan yang sudah
+diketahui.
+
+1. Jalankan `docker compose up --build`, lalu buka <http://localhost:3000>.
+   Periksa badge indeks dan kartu **Konfigurasi retrieval aktif** di Ringkasan.
+2. Buka **Basis kasus** → **Kasus baru**. Tambahkan dua atau tiga kasus sintetis
+   dengan pengadilan, nomor perkara, narasi pra-putusan, kategori yang sama
+   (misalnya `pencurian`), dan hasil aktual yang berbeda (misalnya 240, 360, dan
+   540 hari). Pasal dan atribut boleh dikosongkan.
+3. Buka **Estimasi 4R**, isi narasi serupa dan kategori yang sama, lalu tekan
+   **Jalankan Retrieve**. Periksa angka Reuse, rentang hasil aktual referensi,
+   komponen skor, perbandingan atribut, sumber, dan perhitungan berbobot.
+4. Untuk **Revise**, isi **Hasil aktual (hari penjara)** dari putusan dan tekan
+   **Terapkan Revise**. UI hanya membandingkan hasil aktual dengan estimasi;
+   basis kasus belum berubah.
+5. Untuk **Retain**, tekan **Retain ke basis kasus**. Kasus baru disimpan dengan
+   hasil aktual tersebut, bukan dengan angka estimasi. Indeks lama dibatalkan;
+   estimasi berikutnya membangun indeks dari basis kasus terbaru.
+6. Di **Basis kasus**, coba **Ubah** dan **Hapus**. Perubahan menaikkan generasi
+   basis kasus dan membuat indeks lama tidak dipakai. Kasus yang dihapus tidak
+   lagi menjadi referensi setelah indeks dibangun ulang.
+7. Hentikan dan jalankan ulang container tanpa `down -v`; jumlah unit dan hasil
+   aktual harus tetap ada.
+
+Bila narasi kosong, permintaan ditolak sebelum estimasi. Bila tidak ada kasus
+yang memenuhi syarat, UI menampilkan kode dan alasan penahanan
+(`TIDAK_ADA_REFERENSI_KATEGORI`, `REFERENSI_TIDAK_CUKUP`, dan seterusnya) tanpa
+mengisi angka. Status indeks dapat berupa `siap`, `perlu dibangun ulang`,
+`sedang dibangun`, atau `gagal`; estimasi ditahan selama indeks belum siap.
+
+Konfigurasi aktif berada di [`config/retrieval.json`](config/retrieval.json) dan
+disalin ke image saat build. Untuk mengubahnya, edit file tersebut lalu jalankan
+`docker compose up --build`; UI hanya menampilkan konfigurasi yang tersimpan,
+tidak menyediakan angka tersembunyi yang dapat diubah.
+
+### Endpoint API
+
+| Metode | Path | Kegunaan |
+| --- | --- | --- |
+| `GET` | `/api/health` | Status aplikasi, skema, jumlah unit, dan generasi. |
+| `POST` | `/api/estimates` | Retrieve + Reuse untuk satu fakta pra-putusan; mengembalikan referensi, skor, perhitungan, atau alasan penahanan. |
+| `GET` | `/api/index/status` | Status indeks dan fingerprint konfigurasi aktif. |
+| `GET` | `/api/config` | Konfigurasi retrieval aktif beserta sumber file. |
+| `GET` | `/api/cases` | Daftar unit kasus dengan pencarian dan paginasi. |
+| `GET` | `/api/cases/:id` | Detail fakta, hasil aktual, sumber, dan kelompok. |
+| `POST` | `/api/cases` | Tambah unit kasus (dipakai Retain dan CRUD). |
+| `PUT` | `/api/cases/:id` | Ganti fakta/identitas/hasil aktual satu unit. |
+| `PATCH` | `/api/cases/:id/outcome` | Ubah hasil aktual saja. |
+| `DELETE` | `/api/cases/:id` | Hapus unit dan bersihkan kelompok yatim. |
+
+Semua endpoint berada di bawah `/api`; tidak ada autentikasi karena aplikasi ini
+untuk satu pengguna lokal.
 
 ## Lokasi data
 
@@ -288,6 +352,9 @@ npm test               # unit test data layer, CLI, importer, dan isolasi paket 
 # API + frontend hasil build pada http://localhost:3000
 DATABASE_PATH=./data/app.db WEB_DIST_DIR=./apps/web/dist npm start
 
+# Opsional: konfigurasi retrieval selain config/retrieval.json
+# RETRIEVAL_CONFIG_PATH=./config/retrieval.json npm start
+
 # Frontend dev server dengan proxy /api ke API lokal
 npm run dev:web
 npm run dev:api
@@ -323,16 +390,27 @@ dilepas; bila build gagal, estimasi ditahan, bukan diisi dengan hasil basi.
 
 1. `npm ci && npm run typecheck && npm test && npm run build`
 2. `docker compose up --build`, lalu buka `http://localhost:3000` dan
-   `http://localhost:3000/api/health`.
+   `http://localhost:3000/api/health`. Ringkasan harus menampilkan fingerprint
+   konfigurasi, sumber `config/retrieval.json`, dan status indeks.
 3. Migrasi database kosong: hapus volume **hanya untuk pemeriksaan** dengan
    `docker compose down -v`, lalu `docker compose up --build`; status skema
    harus `002`.
-4. Persistensi: tambahkan unit kasus sintetis melalui `create-case`, lalu
-   `docker compose up -d --force-recreate`; jumlah unit harus tetap.
-5. Impor: jalankan `source:acquire`, hentikan aplikasi, jalankan layanan
+4. Alur 4R: tambahkan 2–3 unit sintetis melalui UI, jalankan Retrieve, dan
+   periksa referensi, skor, perhitungan, serta rentang hasil aktual. Uji narasi
+   kosong (ditolak) dan kategori tanpa kasus (estimasi ditahan dengan alasan).
+   Untuk Revise/Retain, gunakan data sintetis atau salinan basis kasus—bukan
+   unit dari split evaluasi. Hasil aktual harus berasal dari putusan, bukan dari
+   estimasi.
+5. CRUD dan indeks: ubah lalu hapus satu unit, jalankan estimasi berikutnya,
+   dan pastikan indeks dibangun ulang serta unit yang dihapus tidak lagi menjadi
+   referensi. Status indeks tidak boleh tetap `siap` setelah mutasi.
+6. Persistensi: tambahkan unit kasus sintetis, lalu
+   `docker compose up -d --force-recreate`; jumlah unit dan hasil aktual harus
+   tetap.
+7. Impor: jalankan `source:acquire`, hentikan aplikasi, jalankan layanan
    `import`, lalu periksa `artifacts/import/import-report.json`. Jalankan ulang
    impor dan pastikan jumlah unit tidak bertambah dua kali.
-6. Benchmark: jalankan perintah `benchmark` pada database hasil impor dan
+8. Benchmark: jalankan perintah `benchmark` pada database hasil impor dan
    pastikan laporan memisahkan fase startup/rebuild dari latensi pencarian.
-7. Isolasi mount: jalankan `node scripts/verify-mount-isolation.mjs` dan
+9. Isolasi mount: jalankan `node scripts/verify-mount-isolation.mjs` dan
    pastikan hash database aplikasi tidak berubah.

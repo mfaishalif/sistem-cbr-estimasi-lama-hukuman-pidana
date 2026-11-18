@@ -8,11 +8,18 @@ import {
   countCaseGroups,
   countCaseUnits,
   createCaseUnit,
+  deleteCaseUnit,
   getCaseBaseGeneration,
   getCaseUnit,
   getConfig,
+  insertSourceAlias,
+  insertSourceDocument,
+  linkCaseUnitSource,
+  listCaseUnitSources,
   listCaseUnits,
+  listCaseUnitSummaries,
   setConfig,
+  updateCaseUnit,
   ValidationError,
 } from './repositories';
 import { closeDatabase, openDatabase } from './sqlite';
@@ -211,6 +218,142 @@ describe('case unit repository', () => {
     ).toThrow(ValidationError);
 
     expect(countCaseUnits(db)).toBe(0);
+  });
+
+  it('updates facts and outcome without losing the group or source links', () => {
+    const unitId = createCaseUnit(db, draft);
+    const groupId = getCaseUnit(db, unitId)?.caseGroupId as string;
+    insertSourceDocument(db, {
+      id: 'source-1',
+      contentHash: 'hash-1',
+      snapshotPath: 'synthetic/case-1.xml',
+    });
+    linkCaseUnitSource(db, { caseUnitId: unitId, sourceDocumentId: 'source-1' });
+    const before = getCaseBaseGeneration(db).generation;
+
+    updateCaseUnit(db, unitId, {
+      court: 'PN Bandung',
+      caseNumber: '999/Pid.B/2025/PN Bdg',
+      defendantName: 'Terdakwa Diubah',
+      narration: 'Narasi fakta yang diperbarui.',
+      category: 'penggelapan',
+      actualSentenceDays: 240,
+      articles: [{ law: 'KUHP', article: '372' }],
+      attributes: {
+        role: { type: 'text', value: 'pelaku' },
+      },
+    });
+
+    const updated = getCaseUnit(db, unitId);
+    expect(updated?.identity.court).toBe('PN Bandung');
+    expect(updated?.identity.caseNumber).toBe('999/Pid.B/2025/PN Bdg');
+    expect(updated?.facts.narration).toBe('Narasi fakta yang diperbarui.');
+    expect(updated?.facts.category).toBe('penggelapan');
+    expect(updated?.facts.articles).toHaveLength(1);
+    expect(updated?.facts.attributes).not.toHaveProperty('age_years');
+    expect(updated?.outcome.actualSentenceDays).toBe(240);
+    expect(updated?.caseGroupId).toBe(groupId);
+    expect(listCaseUnitSources(db, unitId)).toHaveLength(1);
+    expect(getCaseBaseGeneration(db).generation).toBeGreaterThan(before);
+  });
+
+  it('keeps the existing outcome when an update omits it', () => {
+    const unitId = createCaseUnit(db, draft);
+    updateCaseUnit(db, unitId, {
+      court: draft.court,
+      caseNumber: draft.caseNumber,
+      narration: 'Narasi baru tanpa menyebut hasil aktual.',
+    });
+
+    expect(getCaseUnit(db, unitId)?.outcome.actualSentenceDays).toBe(360);
+  });
+
+  it('lists summaries with search and pagination', () => {
+    const first = createCaseUnit(db, draft);
+    createCaseUnit(db, {
+      ...draft,
+      court: 'PN Surabaya',
+      caseNumber: '7/Pid.B/2024/PN Sby',
+      defendantName: 'Terdakwa Lain',
+      category: 'penipuan',
+    });
+
+    const all = listCaseUnitSummaries(db, { limit: 1, offset: 0 });
+    expect(all).toHaveLength(1);
+    expect(all[0]).toMatchObject({ articleCount: 2, sourceCount: 0 });
+
+    const searched = listCaseUnitSummaries(db, { query: 'surabaya' });
+    expect(searched).toHaveLength(1);
+    expect(searched[0]?.caseNumber).toBe('7/Pid.B/2024/PN Sby');
+    expect(listCaseUnitSummaries(db, { query: 'tidak-ada' })).toHaveLength(0);
+
+    const byId = listCaseUnitSummaries(db, { query: 'jakarta' });
+    expect(byId[0]?.id).toBe(first);
+  });
+
+  it('returns every alias for a linked source', () => {
+    const unitId = createCaseUnit(db, draft);
+    insertSourceDocument(db, {
+      id: 'source-1',
+      contentHash: 'hash-1',
+      snapshotPath: 'synthetic/case-1.xml',
+      sourceUrl: 'https://example.test/case-1',
+    });
+    insertSourceAlias(db, {
+      id: 'alias-1',
+      sourceDocumentId: 'source-1',
+      aliasType: 'xml_id',
+      aliasValue: 'xml-1',
+    });
+    insertSourceAlias(db, {
+      id: 'alias-2',
+      sourceDocumentId: 'source-1',
+      aliasType: 'url',
+      aliasValue: 'https://example.test/case-1',
+    });
+    linkCaseUnitSource(db, {
+      caseUnitId: unitId,
+      sourceDocumentId: 'source-1',
+      narrationLocation: 'fakta',
+      outcomeLocation: 'amar',
+    });
+
+    expect(listCaseUnitSources(db, unitId)).toEqual([
+      {
+        sourceDocumentId: 'source-1',
+        contentHash: 'hash-1',
+        snapshotPath: 'synthetic/case-1.xml',
+        sourceUrl: 'https://example.test/case-1',
+        narrationLocation: 'fakta',
+        outcomeLocation: 'amar',
+        aliases: ['https://example.test/case-1', 'xml-1'],
+      },
+    ]);
+  });
+
+  it('deletes a case unit and an orphaned group only', () => {
+    const first = createCaseUnit(db, draft);
+    const groupId = getCaseUnit(db, first)?.caseGroupId as string;
+    const second = createCaseUnit(db, {
+      ...draft,
+      defendantName: 'Terdakwa B',
+      caseGroupId: groupId,
+    });
+    const other = createCaseUnit(db, {
+      ...draft,
+      court: 'PN Medan',
+      caseNumber: '2/Pid.B/2024/PN Mdn',
+    });
+
+    expect(deleteCaseUnit(db, first)).toBe(true);
+    expect(getCaseUnit(db, first)).toBeNull();
+    expect(getCaseUnit(db, second)?.caseGroupId).toBe(groupId);
+    expect(countCaseGroups(db)).toBe(2);
+
+    expect(deleteCaseUnit(db, second)).toBe(true);
+    expect(countCaseGroups(db)).toBe(1);
+    expect(getCaseUnit(db, other)).not.toBeNull();
+    expect(deleteCaseUnit(db, 'missing')).toBe(false);
   });
 
   it('returns null for an unknown case unit', () => {

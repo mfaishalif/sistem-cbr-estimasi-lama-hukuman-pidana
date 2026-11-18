@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "preprocessing": {
+    "minTokenLength": 2,
+    "stopwords": [],
+    "sublinearTermFrequency": true,
+    "smoothInverseDocumentFrequency": true
+  },
+  "components": {
+    "narrativeWeight": 1,
+    "articleWeight": 0.5,
+    "attributes": [
+      {
+        "attributeKey": "age_years",
+        "weight": 0.2,
+        "comparator": "number-range",
+        "requireReferenceDate": true,
+        "maxReferenceDateGapDays": 366
+      },
+      {
+        "attributeKey": "gender",
+        "weight": 0.1,
+        "comparator": "categorical"
+      },
+      {
+        "attributeKey": "occupation",
+        "weight": 0.15,
+        "comparator": "categorical"
+      },
+      {
+        "attributeKey": "education",
+        "weight": 0.1,
+        "comparator": "categorical"
+      },
+      {
+        "attributeKey": "role",
+        "weight": 0.2,
+        "comparator": "categorical"
+      },
+      {
+        "attributeKey": "victim_count",
+        "weight": 0.15,
+        "comparator": "number-range"
+      },
+      {
+        "attributeKey": "victim_harm",
+        "weight": 0.2,
+        "comparator": "set"
+      },
+      {
+        "attributeKey": "loss_amount_idr",
+        "weight": 0.2,
+        "comparator": "number-log-range"
+      },
+      {
+        "attributeKey": "weapon_or_mode",
+        "weight": 0.2,
+        "comparator": "set"
+      },
+      {
+        "attributeKey": "prior_conviction",
+        "weight": 0.15,
+        "comparator": "categorical"
+      }
+    ]
+  },
+  "categoryRestriction": "when-known",
+  "retrieval": {
+    "maxReferences": 5,
+    "minReferences": 1,
+    "minScore": 0,
+    "minAttributeCoverage": 0
+  },
+  "rounding": "nearest-day-half-up"
+}
