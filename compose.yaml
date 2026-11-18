@@ -1,0 +1,66 @@
+name: cbr-estimasi-lama-hukuman
+
+x-app: &app
+  build:
+    context: .
+    target: runtime
+  image: cbr-estimasi-lama-hukuman:local
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  environment:
+    DATABASE_PATH: /data/app.db
+    WEB_DIST_DIR: /app/apps/web/dist
+    PORT: "3000"
+
+services:
+  app:
+    <<: *app
+    # Loopback-only: this is a single-user local application, not a public service.
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - app-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then(r => { if (!r.ok) process.exit(1); }).catch(() => process.exit(1));"
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  # Import runs from the same image as a one-off tool. Stop `app` before a
+  # large import. Raw sources are mounted read-only and are never part of the
+  # image or build context.
+  import:
+    <<: *app
+    profiles: ["tools"]
+    entrypoint: ["node", "tools/cli/dist/index.js"]
+    command: ["import", "--source", "/sources", "--database", "/data/app.db"]
+    volumes:
+      - app-data:/data
+      - ./data/raw:/sources:ro
+
+  # Evaluation uses its own workspace and database. The application database
+  # volume is deliberately not mounted here. Raw sources are read-only.
+  evaluate:
+    <<: *app
+    profiles: ["tools"]
+    environment:
+      DATABASE_PATH: /workspace/evaluation.db
+      WEB_DIST_DIR: /app/apps/web/dist
+      PORT: "3000"
+    entrypoint: ["node", "tools/cli/dist/index.js"]
+    command: ["evaluate", "--workspace", "/workspace", "--artifacts", "/artifacts"]
+    volumes:
+      - ./data/evaluation:/workspace
+      - ./artifacts/evaluation:/artifacts
+      - ./data/raw:/sources:ro
+
+volumes:
+  app-data:

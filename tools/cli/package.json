@@ -1,0 +1,21 @@
+{
+  "name": "@cbr/cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Command line tools for migrations, import, and evaluation",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "cbr": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@cbr/core": "0.1.0",
+    "@cbr/data": "0.1.0"
+  }
+}
