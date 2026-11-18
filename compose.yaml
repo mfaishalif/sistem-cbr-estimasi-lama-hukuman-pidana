@@ -64,11 +64,53 @@ services:
       WEB_DIST_DIR: /app/apps/web/dist
       PORT: "3000"
     entrypoint: ["node", "tools/cli/dist/index.js"]
-    command: ["evaluate", "--workspace", "/workspace", "--artifacts", "/artifacts"]
+    command:
+      - evaluate
+      - --workspace
+      - /workspace
+      - --artifacts
+      - /artifacts
+      - --source
+      - /sources/indo-law
+      - --stage
+      - all
     volumes:
       - ./data/evaluation:/workspace
       - ./artifacts/evaluation:/artifacts
       - ./data/raw:/sources:ro
+      - ./fixtures/indo-law-synthetic:/fixture:ro
+
+  # Full evaluation pipeline on the committed synthetic fixture. This proves
+  # the Docker flow without the real Indo-Law snapshot and keeps its own
+  # workspace/artifacts so it cannot clobber a real evaluation run.
+  evaluate-fixture:
+    <<: *app
+    profiles: ["tools"]
+    environment:
+      DATABASE_PATH: /workspace/evaluation.db
+      WEB_DIST_DIR: /app/apps/web/dist
+      PORT: "3000"
+    entrypoint: ["node", "tools/cli/dist/index.js"]
+    command:
+      - evaluate
+      - --workspace
+      - /workspace
+      - --artifacts
+      - /artifacts
+      - --source
+      - /fixture
+      - --stage
+      - all
+      - --min-validation-units
+      - "8"
+      - --min-validation-groups
+      - "8"
+      - --min-candidate-estimates
+      - "0"
+    volumes:
+      - ./data/evaluation-fixture:/workspace
+      - ./artifacts/evaluation-fixture:/artifacts
+      - ./fixtures/indo-law-synthetic:/fixture:ro
 
 volumes:
   app-data:

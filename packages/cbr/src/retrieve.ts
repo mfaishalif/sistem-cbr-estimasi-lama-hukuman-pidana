@@ -69,17 +69,18 @@ function queryAttributes(
 
 function attributeComponent(
   component: AttributeComponentConfig,
+  weight: number,
   similarity: number,
   detail: Record<string, unknown>,
 ): ScoreComponent {
   return {
     key: component.attributeKey,
     kind: 'attribute',
-    weight: component.weight,
+    weight,
     // Recomputed once the total available weight is known.
     normalizedWeight: 0,
     similarity,
-    contribution: component.weight * similarity,
+    contribution: weight * similarity,
     comparator: component.comparator,
     detail,
   };
@@ -146,16 +147,36 @@ function scoreCandidate(
     }
   }
 
-  for (const component of config.components.attributes) {
-    if (component.weight === 0) {
-      continue;
+  const groupWeight = config.components.attributeGroupWeight;
+  const participatingAttributes = config.components.attributes.filter(
+    (component) => component.weight > 0,
+  );
+  const knownAttributeCount =
+    groupWeight === undefined
+      ? 0
+      : participatingAttributes.filter((component) =>
+          queryAttributeValues.has(component.attributeKey),
+        ).length;
+  const attributeWeight = (component: AttributeComponentConfig): number => {
+    if (groupWeight === undefined) {
+      return component.weight;
     }
+    return knownAttributeCount === 0 ? 0 : groupWeight / knownAttributeCount;
+  };
+
+  if (groupWeight !== undefined && knownAttributeCount > 0) {
+    queryKnownWeight += groupWeight;
+  }
+
+  for (const component of participatingAttributes) {
     const queryValue = queryAttributeValues.get(component.attributeKey);
     if (queryValue === undefined) {
       continue;
     }
 
-    queryKnownWeight += component.weight;
+    if (groupWeight === undefined) {
+      queryKnownWeight += component.weight;
+    }
     const candidateValue = indexed.attributeValues.get(component.attributeKey);
     if (candidateValue === undefined) {
       missingCandidateAttributeKeys.push(component.attributeKey);
@@ -182,11 +203,12 @@ function scoreCandidate(
     if (dateComparison.gapDays !== null) {
       detail.referenceDateGapDays = dateComparison.gapDays;
     }
-    availableWeight += component.weight;
-    comparableWeight += component.weight;
+    const weight = attributeWeight(component);
+    availableWeight += weight;
+    comparableWeight += weight;
     comparedAttributeKeys.push(component.attributeKey);
     components.push(
-      attributeComponent(component, clampScore(compared.similarity), detail),
+      attributeComponent(component, weight, clampScore(compared.similarity), detail),
     );
   }
 
@@ -238,10 +260,12 @@ function makeScoringSummary(
     configFingerprint: index.configFingerprint,
     narrativeWeight: config.components.narrativeWeight,
     articleWeight: config.components.articleWeight,
-    configuredAttributeWeight: config.components.attributes.reduce(
-      (total, component) => total + component.weight,
-      0,
-    ),
+    configuredAttributeWeight:
+      config.components.attributeGroupWeight ??
+      config.components.attributes.reduce(
+        (total, component) => total + component.weight,
+        0,
+      ),
     maxReferences: config.retrieval.maxReferences,
     minReferences: config.retrieval.minReferences,
     minScore: config.retrieval.minScore,
@@ -574,10 +598,12 @@ export function withheldForUnavailableIndex(options: {
       narrativeWeight: config?.components.narrativeWeight ?? 0,
       articleWeight: config?.components.articleWeight ?? 0,
       configuredAttributeWeight:
+        config?.components.attributeGroupWeight ??
         config?.components.attributes.reduce(
           (total, component) => total + component.weight,
           0,
-        ) ?? 0,
+        ) ??
+        0,
       maxReferences: config?.retrieval.maxReferences ?? 0,
       minReferences: config?.retrieval.minReferences ?? 0,
       minScore: config?.retrieval.minScore ?? 0,

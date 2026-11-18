@@ -30,6 +30,8 @@ export interface AttributeComponentConfig {
 export interface PreprocessingConfig {
   minTokenLength: number;
   stopwords: readonly string[];
+  /** Terms seen in fewer reference documents are excluded from the vocabulary. */
+  minDocumentFrequency: number;
   /** Log-scaled term frequency instead of raw counts. */
   sublinearTermFrequency: boolean;
   /** Smoothed inverse document frequency: ln((N + 1) / (df + 1)) + 1. */
@@ -40,6 +42,14 @@ export interface ScoringComponentsConfig {
   narrativeWeight: number;
   articleWeight: number;
   attributes: readonly AttributeComponentConfig[];
+  /**
+   * Evaluation-style total weight for the attribute group. When set, the group
+   * weight is shared equally by the attributes the query knows about, and the
+   * per-attribute weights only select which attributes participate (weight 0
+   * excludes the attribute). When unset, the per-attribute weights apply as
+   * before.
+   */
+  attributeGroupWeight?: number;
 }
 
 export interface RetrievalLimitsConfig {
@@ -96,6 +106,7 @@ export const DEFAULT_RETRIEVAL_CONFIG: RetrievalConfig = {
   preprocessing: {
     minTokenLength: 2,
     stopwords: [],
+    minDocumentFrequency: 1,
     sublinearTermFrequency: true,
     smoothInverseDocumentFrequency: true,
   },
@@ -160,6 +171,11 @@ export function validateRetrievalConfig(config: RetrievalConfig): void {
   }
 
   requireInteger(config.preprocessing.minTokenLength, 'preprocessing.minTokenLength', 1);
+  requireInteger(
+    config.preprocessing.minDocumentFrequency,
+    'preprocessing.minDocumentFrequency',
+    1,
+  );
   requireInteger(config.retrieval.maxReferences, 'retrieval.maxReferences', 1);
   requireInteger(config.retrieval.minReferences, 'retrieval.minReferences', 1);
   if (config.retrieval.minReferences > config.retrieval.maxReferences) {
@@ -180,6 +196,17 @@ export function validateRetrievalConfig(config: RetrievalConfig): void {
   }
   if (config.components.articleWeight < 0) {
     throw new RetrievalConfigError('components.articleWeight must not be negative');
+  }
+  if (config.components.attributeGroupWeight !== undefined) {
+    requireFiniteNumber(
+      config.components.attributeGroupWeight,
+      'components.attributeGroupWeight',
+    );
+    if (config.components.attributeGroupWeight < 0) {
+      throw new RetrievalConfigError(
+        'components.attributeGroupWeight must not be negative',
+      );
+    }
   }
 
   const seenKeys = new Set<string>();
@@ -240,6 +267,9 @@ export function resolveRetrievalConfig(
         ...(overrides.components?.attributes ??
           DEFAULT_RETRIEVAL_CONFIG.components.attributes),
       ],
+      ...(overrides.components?.attributeGroupWeight === undefined
+        ? {}
+        : { attributeGroupWeight: overrides.components.attributeGroupWeight }),
     },
     categoryRestriction:
       overrides.categoryRestriction ?? DEFAULT_RETRIEVAL_CONFIG.categoryRestriction,

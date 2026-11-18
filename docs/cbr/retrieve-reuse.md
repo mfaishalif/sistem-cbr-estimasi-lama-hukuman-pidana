@@ -36,7 +36,9 @@ dikecualikan agar tidak menjadi referensi bagi dirinya sendiri.
 
 1. Narasi dinormalisasi: NFKD, diakritik dihapus, huruf kecil, setiap deret
    non-huruf/non-angka menjadi spasi. Angka dipertahankan.
-2. Token dipotong berdasarkan `minTokenLength` dan daftar `stopwords`.
+2. Token dipotong berdasarkan `minTokenLength`, daftar `stopwords`, dan
+   `minDocumentFrequency`. Istilah yang muncul pada dokumen training lebih
+   sedikit dari batas tersebut tidak masuk kosakata.
 3. Kosakata dan IDF **hanya** di-fit dari narasi kasus referensi/training.
 4. TF-IDF memakai TF sublinear `1 + ln(count)` dan IDF halus
    `ln((N + 1) / (df + 1)) + 1` secara default.
@@ -75,6 +77,13 @@ kandidat, atau tidak aman dibandingkan, menurunkan coverage dan dilaporkan.
 Pasal dakwaan mengikuti aturan yang sama: bila kueri memuat pasal tetapi
 kandidat tidak memilikinya, bobot pasal menurunkan coverage dan daftar pasal
 yang tidak dapat dibandingkan dilaporkan.
+
+Untuk grid evaluasi, `components.attributeGroupWeight` dapat diisi sebagai bobot
+total kelompok atribut. Nilai itu dibagi rata di antara atribut yang diketahui
+kueri; bobot per atribut hanya menandai atribut mana yang ikut (bobot 0 berarti
+tidak ikut). `coverage` tetap dihitung dari bagian bobot opsional yang
+dibandingkan pada kedua sisi. Konfigurasi aplikasi tidak mengisi field ini,
+sehingga perilaku default tidak berubah.
 
 Setiap komponen hasil memuat `weight`, `normalizedWeight`, `similarity`,
 `contribution`, dan detail perbandingan. Dengan demikian perhitungan dapat
@@ -179,11 +188,14 @@ yang dapat menyajikan data basi setelah restart.
 | `categoryRestriction` | `when-known` |
 | `minTokenLength` | 2 |
 | `stopwords` | kosong |
+| `minDocumentFrequency` | 1 |
+| `attributeGroupWeight` | tidak diset (memakai bobot per atribut) |
 | TF sublinear / IDF halus | aktif |
 
 Bobot atribut default berkisar 0.1–0.2 per atribut. Semua parameter dapat
-diinjeksi lewat `RetrievalConfig`; nilai akhir tetap menunggu tiket evaluasi
-konfigurasi (#17). Jangan menganggap nilai ini tervalidasi secara empiris.
+diinjeksi lewat `RetrievalConfig`. Grid evaluasi memakai konfigurasi tersendiri
+yang dicatat di artefak evaluasi (lihat README); nilai default aplikasi tetap
+placeholder dan jangan dianggap tervalidasi secara empiris.
 
 ## Benchmark kecepatan
 
@@ -221,7 +233,7 @@ Benchmark memisahkan:
 | Istilah indeks | 59.699 |
 | Ukuran database | 85.151.744 byte (sekitar 81,2 MiB) |
 | Generasi saat ukur | 31.406 |
-| Fingerprint konfigurasi | `c992d8c713c46e73` |
+| Fingerprint konfigurasi | `c992d8c713c46e73` (default sebelum `minDocumentFrequency` eksplisit) |
 | Kueri terukur | 500 kasus layak, disebar merata, kasus sendiri dikecualikan |
 | Pemanasan | 20 pencarian |
 
