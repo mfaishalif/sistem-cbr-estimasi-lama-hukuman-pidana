@@ -51,6 +51,27 @@ docker compose down          # hapus container, volume data tetap
 ada perintah aplikasi yang menghapus data secara diam-diam; reset hanya terjadi
 bila Anda menjalankan `down -v` atau menghapus volume sendiri.
 
+### Volume uji terpisah
+
+Untuk mencoba alur mahasiswa tanpa menyentuh basis kasus utama, jalankan Compose
+dengan nama proyek sendiri. Nama proyek menentukan nama volume, jaringan, dan
+container:
+
+```bash
+# Linux/macOS
+COMPOSE_PROJECT_NAME=cbr-demo docker compose up --build
+
+# PowerShell
+$env:COMPOSE_PROJECT_NAME = 'cbr-demo'; docker compose up --build
+```
+
+Volume demo menjadi `cbr-demo_app-data`, terpisah dari
+`cbr-estimasi-lama-hukuman_app-data`. Hentikan demo dengan
+`docker compose -p cbr-demo down` (data tetap) atau
+`docker compose -p cbr-demo down -v` (data demo dihapus). Workspace evaluasi
+tetap terpisah karena memakai bind mount `data/evaluation` dan
+`artifacts/evaluation`, bukan volume aplikasi.
+
 ## Panduan singkat: data sintetis dan alur 4R
 
 Panduan ini memakai data sintetis, bukan putusan nyata. Jangan memasukkan hasil
@@ -64,8 +85,9 @@ diketahui.
    (misalnya `pencurian`), dan hasil aktual yang berbeda (misalnya 240, 360, dan
    540 hari). Pasal dan atribut boleh dikosongkan.
 3. Buka **Estimasi 4R**, isi narasi serupa dan kategori yang sama, lalu tekan
-   **Jalankan Retrieve**. Periksa angka Reuse, rentang hasil aktual referensi,
-   komponen skor, perbandingan atribut, sumber, dan perhitungan berbobot.
+   **Jalankan Retrieve**. Buka setiap kartu referensi untuk memeriksa skor,
+   komponen skor, perbandingan atribut, sumber, dan perhitungan Reuse berbobot.
+   Periksa juga angka Reuse dan rentang hasil aktual referensi.
 4. Untuk **Revise**, isi **Hasil aktual (hari penjara)** dari putusan dan tekan
    **Terapkan Revise**. UI hanya membandingkan hasil aktual dengan estimasi;
    basis kasus belum berubah.
@@ -77,6 +99,29 @@ diketahui.
    lagi menjadi referensi setelah indeks dibangun ulang.
 7. Hentikan dan jalankan ulang container tanpa `down -v`; jumlah unit dan hasil
    aktual harus tetap ada.
+
+### Catatan verifikasi alur mahasiswa
+
+Alur pada panduan ini sudah dicoba pada 18 November 2026 dari checkout bersih
+(`origin/main` `5ba24e3`) dengan Docker 29.7.2, Compose v5.5.1, dan volume uji
+`cbr-verify-27`. Perintah dan hasil yang diperiksa:
+
+| Tindakan | Hasil yang diharapkan dan diperiksa |
+| --- | --- |
+| `docker compose up -d --build` pada checkout tanpa `node_modules` | Build berhasil; `/api/health` melaporkan skema `002`, 0 unit, dan indeks `siap`. Ringkasan menampilkan fingerprint `config/retrieval.json`. |
+| Tambah tiga kasus `pencurian` lewat UI dengan hasil aktual 240, 360, dan 540 hari | Daftar menampilkan 3 unit; setiap detail menampilkan hasil aktual yang disimpan. Indeks menjadi perlu dibangun ulang setelah mutasi. |
+| Retrieve dengan narasi serupa | Estimasi 315 hari dari 3 referensi; skor 0,823 / 0,461 / 0,181; hasil aktual referensi 240–540 hari; kartu referensi menampilkan komponen skor dan perhitungan berbobot. |
+| Retrieve dengan narasi kosong | Ditolak sebelum estimasi dengan pesan narasi wajib. |
+| Retrieve kategori `pembunuhan` tanpa kasus | Estimasi ditahan tanpa angka, alasan ditampilkan, kode `TIDAK_ADA_REFERENSI_KATEGORI`, 0 referensi. |
+| Revise 300 hari, lalu Retain | Revise menampilkan selisih −15 hari dan tidak mengubah basis kasus; Retain menyimpan unit baru dan detail kasus menampilkan 300 hari. |
+| `docker compose up -d --force-recreate` | 4 unit tetap ada, unit hasil Retain masih dapat dicari, generasi basis kasus tetap. |
+| Impor fixture sintetis (lihat bawah) | 90 unit dan 90 kelompok diterima; laporan impor mencatat 0 konflik; `/api/health` menampilkan 90 unit. |
+| `docker compose --profile tools run --rm evaluate-fixture` | Split 63/14/13, 32 kandidat divalidasi, kandidat `kandidat-08` dikunci, dan `test-report.json` terbentuk. |
+| `node scripts/verify-mount-isolation.mjs` | Hash `/data/app.db` sebelum dan sesudah evaluasi sama; database aplikasi tidak dipasang di container evaluasi. |
+| `npm ci && npm run typecheck && npm test` | Typecheck lulus dan 168 test lulus. |
+
+Angka di atas berasal dari data sintetis pada volume uji, bukan klaim akurasi
+atau hasil evaluasi Indo-Law.
 
 Bila narasi kosong, permintaan ditolak sebelum estimasi. Bila tidak ada kasus
 yang memenuhi syarat, UI menampilkan kode dan alasan penahanan
@@ -291,6 +336,30 @@ dokumen diterima/dilewati beserta alasannya, kategori yang lolos, kelengkapan
 atribut, hasil aktual menurut jenis dukungan, salinan/kelompok/konflik, ukuran
 dan waktu pemrosesan. Laporan tidak memuat narasi, nama, atau nomor perkara.
 
+Untuk mencoba seluruh jalur impor tanpa mengunduh snapshot Indo-Law, pakai
+fixture sintetis yang sudah dikomit. Fixture ini juga dipakai oleh
+`evaluate-fixture`:
+
+```bash
+# Salin fixture ke lokasi snapshot lokal (folder data/ tidak masuk Git)
+mkdir -p data/raw/indo-law
+cp -R fixtures/indo-law-synthetic/. data/raw/indo-law/
+
+# Impor mengganti basis kasus aplikasi, jadi hentikan aplikasi lebih dulu
+docker compose stop app
+docker compose --profile tools run --rm import
+docker compose start app
+```
+
+Di PowerShell, ganti dua baris pertama dengan:
+`New-Item -ItemType Directory -Force -Path data/raw/indo-law` dan
+`Copy-Item -Recurse -Force fixtures/indo-law-synthetic/* data/raw/indo-law/`.
+
+Hasil yang diperiksa: 90 XML dibaca, 90 unit dan 90 kelompok diterima tanpa
+konflik, dan `artifacts/import/import-report.json` terbentuk. Jalankan impor dua
+kali; jumlah unit harus tetap 90, bukan 180. Untuk mempertahankan basis kasus
+demo, gunakan nama proyek terpisah seperti pada bagian **Volume uji terpisah**.
+
 Rincian aturan ekstraksi, hasil uji snapshot penuh, dan batasnya:
 [`docs/import/indo-law-import.md`](docs/import/indo-law-import.md).
 
@@ -389,6 +458,10 @@ node scripts/verify-mount-isolation.mjs
 
 Skrip menjalankan alur evaluasi pada fixture, membandingkan hash `/data/app.db`
 sebelum/sesudah, dan memastikan `/data/app.db` tidak ada di container evaluasi.
+Container evaluasi berhenti sendiri setelah perintah selesai. `docker compose
+down` atau `down -v` tidak menghapus `data/evaluation` dan
+`artifacts/evaluation` karena keduanya bind mount host; hapus folder itu hanya
+bila ingin mengulang evaluasi dari nol.
 
 ### Fungsi pembagian dan metrik evaluasi
 
@@ -484,9 +557,10 @@ dilepas; bila build gagal, estimasi ditahan, bukan diisi dengan hasil basi.
 6. Persistensi: tambahkan unit kasus sintetis, lalu
    `docker compose up -d --force-recreate`; jumlah unit dan hasil aktual harus
    tetap.
-7. Impor: jalankan `source:acquire`, hentikan aplikasi, jalankan layanan
-   `import`, lalu periksa `artifacts/import/import-report.json`. Jalankan ulang
-   impor dan pastikan jumlah unit tidak bertambah dua kali.
+7. Impor: jalankan `source:acquire` atau salin fixture sintetis seperti pada
+   bagian impor, hentikan aplikasi, jalankan layanan `import`, lalu periksa
+   `artifacts/import/import-report.json`. Jalankan ulang impor dan pastikan
+   jumlah unit tidak bertambah dua kali (fixture: tetap 90 unit).
 8. Benchmark: jalankan perintah `benchmark` pada database hasil impor dan
    pastikan laporan memisahkan fase startup/rebuild dari latensi pencarian.
 9. Evaluasi pada fixture: buat folder `data/evaluation-fixture` dan
