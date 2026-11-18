@@ -22,6 +22,18 @@ Perkara yang fakta relevannya sudah tersedia, tetapi putusannya belum diketahui 
 **Kasus historis**:
 Pengalaman perkara terdahulu yang memiliki informasi perkara dan hasil putusan sebagai sumber pengetahuan.
 
+**Pembagian evaluasi**:
+Pembagian unit kasus ke bagian training, validasi, dan test dengan seed serta proporsi yang dicatat. Seluruh anggota satu kelompok perkara berada pada bagian yang sama.
+
+**Estimasi ditahan**:
+Keadaan ketika mesin tidak menghasilkan angka estimasi karena syarat kelayakan tidak terpenuhi. Alasan penahanan disertakan; nol atau tebakan tidak dipakai sebagai pengganti.
+
+**Cakupan estimasi**:
+Proporsi unit layak yang memperoleh angka estimasi. Unit tanpa hasil aktual positif yang diketahui tidak masuk penyebut.
+
+**Pembanding median**:
+Nilai median hasil aktual training secara keseluruhan atau per kategori yang dipakai sebagai pembanding sederhana. Kategori yang tidak ditemukan di training memakai median keseluruhan.
+
 **Basis kasus (case base)**:
 Kumpulan kasus historis yang menjadi sumber pengalaman untuk penalaran berbasis kasus.
 
