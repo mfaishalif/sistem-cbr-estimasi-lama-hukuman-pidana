@@ -158,8 +158,7 @@ describe('case-base index manager', () => {
       components: { attributes: [] },
     });
     let changed = false;
-    let manager: CaseBaseIndexManager;
-    manager = new CaseBaseIndexManager({
+    const manager = new CaseBaseIndexManager({
       source,
       buildIndex: (cases, config, options) => {
         const index = buildRetrievalIndex(cases, config, options);

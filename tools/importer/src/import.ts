@@ -1,5 +1,5 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { FACT_ATTRIBUTE_KEYS } from '@cbr/core';
 import type { CaseUnitDraft } from '@cbr/core';
@@ -33,7 +33,6 @@ import {
   discoverSnapshot,
   normalizedXmlContentHash,
   sha256Hex,
-  SnapshotError,
   type DiscoveredFile,
   type DiscoveredSnapshot,
 } from './snapshot';
@@ -219,7 +218,7 @@ function processFile(
   const parseStart = performance.now();
   try {
     document = parseIndoLawXml(bytes.toString('utf8'));
-  } catch (error) {
+  } catch {
     accumulator.parseMs += performance.now() - parseStart;
     accumulator.documentsSkipped += 1;
     skip(accumulator, 'invalid_xml', file.relativePath);

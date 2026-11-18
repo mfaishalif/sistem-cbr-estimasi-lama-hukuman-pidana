@@ -283,9 +283,9 @@ export function runBenchmark(options: RunBenchmarkOptions): BenchmarkReport {
 
   let config!: RetrievalConfig;
   let snapshot!: ReturnType<typeof loadCaseBaseSnapshot>;
-  let configLoadMs = 0;
-  let snapshotLoadMs = 0;
-  let closeDurationMs = 0;
+  let configLoadMs: number;
+  let snapshotLoadMs: number;
+  let closeDurationMs: number;
   try {
     const configStart = clock();
     config = options.config ?? loadRetrievalConfig(db);
