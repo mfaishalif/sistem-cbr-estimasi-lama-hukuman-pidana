@@ -3,6 +3,8 @@
 /node_modules
 /build
 /tmp
+**/dist/
+**/node_modules/
 
 # Logs
 logs
@@ -25,3 +27,23 @@ lerna-debug.log*
 
 # local audit workspace
 /audit/
+
+# local application data: SQLite database, raw sources, evaluation workspace
+/data/
+
+# evaluation artifacts exported to the host
+/artifacts/
+
+# SQLite side files
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# build/test output
+coverage/
+.vite/
+.cache/
+**/*.tsbuildinfo

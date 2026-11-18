@@ -1,0 +1,33 @@
+{
+  "name": "sistem-cbr-estimasi-lama-hukuman-pidana",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Aplikasi tugas kuliah estimasi lama hukuman pidana dengan penalaran berbasis kasus",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "tools/*"
+  ],
+  "engines": {
+    "node": ">=24.20.0 <25"
+  },
+  "scripts": {
+    "build": "npm run build:packages && npm run build:web && npm run build:api",
+    "build:packages": "tsc -b packages/cbr packages/data tools/cli",
+    "build:api": "tsc -b apps/api",
+    "build:web": "npm run build --workspace @cbr/web",
+    "typecheck": "tsc -b packages/cbr packages/data tools/cli apps/api --pretty && npm run typecheck --workspace @cbr/web",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev:web": "npm run dev --workspace @cbr/web",
+    "dev:api": "npm run build && node --watch apps/api/dist/main.js",
+    "start": "node apps/api/dist/main.js",
+    "db:migrate": "npm run build:packages && node tools/cli/dist/index.js migrate",
+    "db:status": "npm run build:packages && node tools/cli/dist/index.js status"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "typescript": "5.9.3",
+    "vitest": "^5.1.0"
+  }
+}

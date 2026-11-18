@@ -1,0 +1,25 @@
+{
+  "name": "@cbr/data",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SQLite schema, migrations, and repositories for the case base",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@cbr/core": "0.1.0"
+  }
+}
