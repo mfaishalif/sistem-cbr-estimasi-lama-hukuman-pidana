@@ -13,7 +13,6 @@ import {
   formatCopy,
   leakyNarrative,
   malformed,
-  metadataOnly,
   multiDefendant,
   outcomeConflict,
   relatedA,
