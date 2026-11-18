@@ -39,10 +39,12 @@ FROM base AS runtime
 ENV NODE_ENV=production \
     PORT=3000 \
     DATABASE_PATH=/data/app.db \
-    WEB_DIST_DIR=/app/apps/web/dist
+    WEB_DIST_DIR=/app/apps/web/dist \
+    RETRIEVAL_CONFIG_PATH=/app/config/retrieval.json
 
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY package.json ./
+COPY config ./config
 
 COPY --from=build /app/packages/cbr/package.json ./packages/cbr/package.json
 COPY --from=build /app/packages/cbr/dist ./packages/cbr/dist

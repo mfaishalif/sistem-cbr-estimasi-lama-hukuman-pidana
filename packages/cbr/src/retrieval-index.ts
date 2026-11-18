@@ -32,6 +32,7 @@ import {
 export interface IndexedCase {
   id: string;
   caseGroupId: string;
+  identity: CaseBaseCase['identity'];
   category: string | null;
   facts: CaseFacts;
   outcomeDays: number;
@@ -144,6 +145,7 @@ export function buildRetrievalIndex(
     indexedCases.push({
       id: candidate.id,
       caseGroupId: candidate.caseGroupId,
+      identity: candidate.identity,
       category,
       facts: candidate.facts,
       outcomeDays: candidate.outcome.actualSentenceDays as number,

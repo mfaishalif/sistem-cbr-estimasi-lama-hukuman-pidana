@@ -58,6 +58,31 @@ export interface CaseUnitSourceInput {
   sourceOutcomeKind?: 'metadata' | 'metadata-and-verdict' | null;
 }
 
+export interface CaseUnitSummary {
+  id: string;
+  caseGroupId: string;
+  caseGroupLabel: string | null;
+  court: string;
+  caseNumber: string;
+  defendantName: string | null;
+  category: string | null;
+  actualSentenceDays: number | null;
+  articleCount: number;
+  sourceCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CaseUnitSourceSummary {
+  sourceDocumentId: string;
+  contentHash: string;
+  snapshotPath: string;
+  sourceUrl: string | null;
+  narrationLocation: string | null;
+  outcomeLocation: string | null;
+  aliases: string[];
+}
+
 interface CaseUnitRow {
   id: string;
   case_group_id: string;
@@ -139,7 +164,8 @@ function normalizeArticleReference(
   return parts.filter((part) => part.length > 0).join('|');
 }
 
-function validateArticle(article: CaseArticleDraft): CaseArticle {
+/** Validate and normalize one indictment article. Shared by import, API, and CRUD. */
+export function validateArticleDraft(article: CaseArticleDraft): CaseArticle {
   const law = requireText(article.law, 'article.law');
   const articleNumber = requireText(article.article, 'article.article');
   const paragraph = article.paragraph?.trim() || null;
@@ -162,7 +188,8 @@ function validateArticle(article: CaseArticleDraft): CaseArticle {
   };
 }
 
-function validateFactValue(key: string, value: FactValue): FactValue {
+/** Validate one optional fact value. Shared by import, API, and CRUD. */
+export function validateFactValue(key: string, value: FactValue): FactValue {
   const attributeKey = requireText(key, 'attribute key');
 
   const requiredType = requiredAttributeTypes[attributeKey];
@@ -276,7 +303,7 @@ export function createCaseUnit(
     );
   }
 
-  const articles = (draft.articles ?? []).map(validateArticle);
+  const articles = (draft.articles ?? []).map(validateArticleDraft);
   const attributes = Object.entries(draft.attributes ?? {}).map(([key, value]) => ({
     key: requireText(key, 'attribute key'),
     value: validateFactValue(key, value),
@@ -355,6 +382,128 @@ export function createCaseUnit(
 }
 
 /**
+ * Replace the editable fields of one case unit. Source links and the case
+ * group stay intact unless a different existing `caseGroupId` is supplied.
+ * Articles and attributes are replaced as a set; an omitted value stays
+ * omitted instead of being turned into zero or "none".
+ */
+export function updateCaseUnit(
+  db: DatabaseSync,
+  caseUnitId: string,
+  draft: CaseUnitDraft,
+  idFactory: () => string = randomUUID,
+): void {
+  const id = requireText(caseUnitId, 'caseUnitId');
+  const current = getCaseUnit(db, id);
+  if (current === null) {
+    throw new ValidationError(`unknown caseUnitId: ${id}`);
+  }
+
+  const court = requireText(draft.court, 'court');
+  const caseNumber = requireText(draft.caseNumber, 'caseNumber');
+  const narration = requireText(draft.narration, 'narration');
+  const defendantName = draft.defendantName?.trim() || null;
+  const category = draft.category?.trim() || null;
+  const categorySourceLocation = draft.categorySourceLocation?.trim() || null;
+  const identity = normalizeCaseIdentity(court, caseNumber);
+  const actualSentenceDays =
+    draft.actualSentenceDays === undefined
+      ? current.outcome.actualSentenceDays
+      : draft.actualSentenceDays;
+
+  if (
+    actualSentenceDays !== null &&
+    (!Number.isInteger(actualSentenceDays) || actualSentenceDays < 0)
+  ) {
+    throw new ValidationError(
+      'actualSentenceDays must be a non-negative integer when known',
+    );
+  }
+
+  const articles = (draft.articles ?? []).map(validateArticleDraft);
+  const attributes = Object.entries(draft.attributes ?? {}).map(([key, value]) => ({
+    key: requireText(key, 'attribute key'),
+    value: validateFactValue(key, value),
+  }));
+
+  const requestedGroupId = draft.caseGroupId?.trim() || null;
+  let caseGroupId = current.caseGroupId;
+  if (requestedGroupId !== null && requestedGroupId !== current.caseGroupId) {
+    const group = db
+      .prepare('SELECT id FROM case_group WHERE id = ?')
+      .get(requestedGroupId) as { id: string } | undefined;
+    if (group === undefined) {
+      throw new ValidationError(`unknown caseGroupId: ${requestedGroupId}`);
+    }
+    caseGroupId = requestedGroupId;
+  }
+
+  db.exec('SAVEPOINT update_case_unit');
+  try {
+    db.prepare(
+      `UPDATE case_unit
+          SET case_group_id = ?,
+              court = ?,
+              case_number = ?,
+              court_normalized = ?,
+              case_number_normalized = ?,
+              defendant_name = ?,
+              narration = ?,
+              category = ?,
+              category_source_location = ?,
+              actual_sentence_days = ?,
+              updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+        WHERE id = ?`,
+    ).run(
+      caseGroupId,
+      court,
+      caseNumber,
+      identity.court,
+      identity.caseNumber,
+      defendantName,
+      narration,
+      category,
+      categorySourceLocation,
+      actualSentenceDays,
+      id,
+    );
+
+    db.prepare('DELETE FROM case_article WHERE case_unit_id = ?').run(id);
+    db.prepare('DELETE FROM case_fact_attribute WHERE case_unit_id = ?').run(id);
+
+    const insertArticle = db.prepare(
+      `INSERT INTO case_article
+         (id, case_unit_id, law, article, paragraph, arrangement, normalized_reference,
+          raw_text, source_location)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    for (const article of articles) {
+      insertArticle.run(
+        idFactory(),
+        id,
+        article.law,
+        article.article,
+        article.paragraph ?? null,
+        article.arrangement ?? 'primary',
+        article.normalizedReference,
+        article.rawText ?? null,
+        article.sourceLocation ?? null,
+      );
+    }
+
+    for (const attribute of attributes) {
+      insertFactAttribute(db, id, attribute.key, attribute.value);
+    }
+
+    db.exec('RELEASE update_case_unit');
+  } catch (error) {
+    db.exec('ROLLBACK TO update_case_unit');
+    db.exec('RELEASE update_case_unit');
+    throw error;
+  }
+}
+
+/**
  * Retain one case unit with a known positive outcome. Retain never copies an
  * estimate; the caller must supply the actual verdict outcome.
  */
@@ -416,10 +565,32 @@ export function updateCaseUnitOutcome(
  * The generation trigger invalidates derived indexes; no case history is kept.
  */
 export function deleteCaseUnit(db: DatabaseSync, caseUnitId: string): boolean {
-  const result = db
-    .prepare('DELETE FROM case_unit WHERE id = ?')
-    .run(requireText(caseUnitId, 'caseUnitId'));
-  return result.changes > 0;
+  const id = requireText(caseUnitId, 'caseUnitId');
+  const current = db
+    .prepare('SELECT case_group_id FROM case_unit WHERE id = ?')
+    .get(id) as { case_group_id: string } | undefined;
+  if (current === undefined) {
+    return false;
+  }
+
+  db.exec('SAVEPOINT delete_case_unit');
+  try {
+    db.prepare('DELETE FROM case_unit WHERE id = ?').run(id);
+    // Keep the group while any other unit in the same case still uses it.
+    db.prepare(
+      `DELETE FROM case_group
+        WHERE id = ?
+          AND NOT EXISTS (
+            SELECT 1 FROM case_unit WHERE case_group_id = case_group.id
+          )`,
+    ).run(current.case_group_id);
+    db.exec('RELEASE delete_case_unit');
+  } catch (error) {
+    db.exec('ROLLBACK TO delete_case_unit');
+    db.exec('RELEASE delete_case_unit');
+    throw error;
+  }
+  return true;
 }
 
 /** Run a callback inside one immediate transaction. */
@@ -666,6 +837,144 @@ export function listCaseUnits(db: DatabaseSync, limit = 50): CaseUnit[] {
   return rows
     .map((row) => getCaseUnit(db, row.id))
     .filter((unit): unit is CaseUnit => unit !== null);
+}
+
+export interface CaseUnitListOptions {
+  limit?: number;
+  offset?: number;
+  /** Case-insensitive substring over court, case number, defendant, and category. */
+  query?: string;
+}
+
+/** Paginated summaries for the case-base list. Facts stay in `getCaseUnit`. */
+export function listCaseUnitSummaries(
+  db: DatabaseSync,
+  options: CaseUnitListOptions = {},
+): CaseUnitSummary[] {
+  const limit = Math.min(Math.max(Math.trunc(options.limit ?? 25), 1), 200);
+  const offset = Math.max(Math.trunc(options.offset ?? 0), 0);
+  const query = options.query?.trim().toLowerCase() ?? '';
+
+  const where =
+    query === ''
+      ? ''
+      : `WHERE lower(cu.court) LIKE ?
+            OR lower(cu.case_number) LIKE ?
+            OR lower(COALESCE(cu.defendant_name, '')) LIKE ?
+            OR lower(COALESCE(cu.category, '')) LIKE ?`;
+  const pattern = `%${query}%`;
+  const parameters: string[] = query === '' ? [] : [pattern, pattern, pattern, pattern];
+
+  const rows = db
+    .prepare(
+      `SELECT cu.id,
+              cu.case_group_id,
+              cg.label AS case_group_label,
+              cu.court,
+              cu.case_number,
+              cu.defendant_name,
+              cu.category,
+              cu.actual_sentence_days,
+              cu.created_at,
+              cu.updated_at,
+              (SELECT COUNT(*) FROM case_article a WHERE a.case_unit_id = cu.id)
+                AS article_count,
+              (SELECT COUNT(*) FROM case_unit_source s WHERE s.case_unit_id = cu.id)
+                AS source_count
+         FROM case_unit cu
+         LEFT JOIN case_group cg ON cg.id = cu.case_group_id
+         ${where}
+        ORDER BY cu.created_at DESC, cu.id
+        LIMIT ? OFFSET ?`,
+    )
+    .all(...parameters, limit, offset) as unknown as Array<{
+    id: string;
+    case_group_id: string;
+    case_group_label: string | null;
+    court: string;
+    case_number: string;
+    defendant_name: string | null;
+    category: string | null;
+    actual_sentence_days: number | null;
+    article_count: number;
+    source_count: number;
+    created_at: string;
+    updated_at: string;
+  }>;
+
+  return rows.map((row) => ({
+    id: row.id,
+    caseGroupId: row.case_group_id,
+    caseGroupLabel: row.case_group_label,
+    court: row.court,
+    caseNumber: row.case_number,
+    defendantName: row.defendant_name,
+    category: row.category,
+    actualSentenceDays: row.actual_sentence_days,
+    articleCount: row.article_count,
+    sourceCount: row.source_count,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+}
+
+/** Provenance of one case unit, including every known source alias. */
+export function listCaseUnitSources(
+  db: DatabaseSync,
+  caseUnitId: string,
+): CaseUnitSourceSummary[] {
+  const id = requireText(caseUnitId, 'caseUnitId');
+  const rows = db
+    .prepare(
+      `SELECT sd.id AS source_document_id,
+              sd.content_hash,
+              sd.snapshot_path,
+              sd.source_url,
+              cus.narration_location,
+              cus.outcome_location
+         FROM case_unit_source cus
+         JOIN source_document sd ON sd.id = cus.source_document_id
+        WHERE cus.case_unit_id = ?
+        ORDER BY sd.id`,
+    )
+    .all(id) as unknown as Array<{
+    source_document_id: string;
+    content_hash: string;
+    snapshot_path: string;
+    source_url: string | null;
+    narration_location: string | null;
+    outcome_location: string | null;
+  }>;
+
+  const aliases = db
+    .prepare(
+      `SELECT sa.source_document_id, sa.alias_value
+         FROM source_alias sa
+         JOIN case_unit_source cus ON cus.source_document_id = sa.source_document_id
+        WHERE cus.case_unit_id = ?
+        ORDER BY sa.source_document_id, sa.alias_type, sa.alias_value`,
+    )
+    .all(id) as unknown as Array<{ source_document_id: string; alias_value: string }>;
+
+  const aliasesByDocument = new Map<string, string[]>();
+  for (const alias of aliases) {
+    const values = aliasesByDocument.get(alias.source_document_id);
+    if (values === undefined) {
+      aliasesByDocument.set(alias.source_document_id, [alias.alias_value]);
+    } else {
+      values.push(alias.alias_value);
+    }
+  }
+
+  return rows.map((row) => ({
+    sourceDocumentId: row.source_document_id,
+    contentHash: row.content_hash,
+    snapshotPath: row.snapshot_path,
+    sourceUrl: row.source_url,
+    narrationLocation: row.narration_location,
+    outcomeLocation: row.outcome_location,
+    aliases: aliasesByDocument.get(row.source_document_id) ?? [],
+  }));
 }
 
 export function countCaseUnits(db: DatabaseSync): number {

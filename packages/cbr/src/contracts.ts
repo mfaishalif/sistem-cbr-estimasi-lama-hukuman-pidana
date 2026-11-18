@@ -94,6 +94,8 @@ export interface ReferenceDetail {
   rank: number;
   caseUnitId: string;
   caseGroupId: string;
+  /** Court and complete case number of the reference, for traceability. */
+  identity: CaseUnit['identity'];
   score: number;
   actualSentenceDays: number;
   /** weight × similarity for every component available on both sides. */

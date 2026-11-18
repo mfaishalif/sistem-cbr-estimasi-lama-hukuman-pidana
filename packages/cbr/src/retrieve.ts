@@ -289,6 +289,7 @@ function referenceDetails(
     rank: position + 1,
     caseUnitId: candidate.indexed.id,
     caseGroupId: candidate.indexed.caseGroupId,
+    identity: candidate.indexed.identity,
     score: candidate.score,
     actualSentenceDays: candidate.indexed.outcomeDays,
     components: candidate.components,

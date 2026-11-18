@@ -13,7 +13,7 @@ import {
 @Injectable()
 export class DatabaseService implements OnApplicationShutdown {
   private readonly logger = new Logger(DatabaseService.name);
-  private readonly database: DatabaseSync;
+  readonly database: DatabaseSync;
   readonly databasePath: string;
   readonly migration: MigrationResult;
 
