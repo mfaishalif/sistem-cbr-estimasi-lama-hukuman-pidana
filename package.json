@@ -19,6 +19,7 @@
     "typecheck": "tsc -b packages/cbr packages/data tools/importer tools/cli apps/api --pretty && npm run typecheck --workspace @cbr/web",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:evaluation": "vitest run tools/cli/src/evaluation",
     "dev:web": "npm run dev --workspace @cbr/web",
     "dev:api": "npm run build && node --watch apps/api/dist/main.js",
     "start": "node apps/api/dist/main.js",

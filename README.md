@@ -218,6 +218,31 @@ node scripts/verify-mount-isolation.mjs
 Skrip membandingkan hash `/data/app.db` sebelum/sesudah evaluasi dan memastikan
 `/data/app.db` tidak ada di container evaluasi.
 
+### Fungsi pembagian dan metrik evaluasi
+
+`tools/cli/src/evaluation/` berisi fungsi murni yang nantinya dipakai perintah
+`evaluate` (integrasi impor, konfigurasi, dan test terkunci ada pada tiket CLI
+evaluasi):
+
+- `buildSplitManifest(units, { seed, proportions })` membagi training,
+  validasi, dan test per kelompok perkara. Setiap unit masuk tepat sekali, satu
+  kelompok tidak pernah terpecah, dan urutan masukan tidak mengubah hasil.
+  `emptySplits` dilaporkan agar pemanggil dapat menghentikan eksperimen.
+- `buildMedianBaseline(units)` dan `baselineDaysFor` menghitung median training
+  keseluruhan serta per kategori. Kategori kosong atau tidak ditemukan di
+  training memakai median keseluruhan.
+- `evaluatePredictions(predictions, baseline)` menghitung MAE, RMSE, MedAE,
+  jumlah estimasi diterima/ditahan beserta alasannya, cakupan, dan pembanding
+  median pada unit yang persis sama maupun seluruh unit layak. Penyebut nol
+  menghasilkan status `unavailable`, bukan `0` atau `NaN`.
+
+Seed, proporsi akhir, ambang, dan konfigurasi produksi tetap menjadi parameter
+pemanggil sampai keputusan konfigurasi evaluasi ditetapkan. Perintah pengujian:
+
+```bash
+npm run test:evaluation
+```
+
 ## Pengembangan tanpa Docker
 
 ```bash
