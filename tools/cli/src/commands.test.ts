@@ -104,6 +104,63 @@ describe('cli', () => {
     expect(JSON.parse(status.stdout)).toMatchObject({ caseUnits: 1, caseGroups: 1 });
   });
 
+  it('benchmarks the ready index and writes a report', () => {
+    const database = join(directory, 'app.db');
+    const draft = {
+      court: 'PN Jakarta Pusat',
+      caseNumber: '9/Pid.B/2024/PN Jkt.Pst',
+      narration: 'terdakwa mengambil sepeda motor milik korban di depan pasar',
+      category: 'pencurian',
+      actualSentenceDays: 180,
+    };
+
+    expect(
+      run(['create-case', '--database', database, '--json', JSON.stringify(draft)]).code,
+    ).toBe(0);
+    expect(
+      run([
+        'create-case',
+        '--database',
+        database,
+        '--json',
+        JSON.stringify({ ...draft, caseNumber: '10/Pid.B/2024/PN Jkt.Pst' }),
+      ]).code,
+    ).toBe(0);
+
+    const reportPath = join(directory, 'artifacts', 'benchmark.json');
+    const benchmark = run([
+      'benchmark',
+      '--database',
+      database,
+      '--queries',
+      '1',
+      '--warmup',
+      '0',
+      '--report',
+      reportPath,
+    ]);
+
+    expect(benchmark.code).toBe(0);
+    const output = JSON.parse(benchmark.stdout) as {
+      reportPath: string;
+      dataset: { caseCount: number; eligibleCaseCount: number };
+      queries: { selectedCount: number; estimatedCount: number; withheldCount: number };
+      latency: { count: number };
+    };
+    expect(output.reportPath).toBe(reportPath);
+    expect(output.dataset).toMatchObject({ caseCount: 2, eligibleCaseCount: 2 });
+    expect(output.queries.selectedCount).toBe(1);
+    expect(output.queries.estimatedCount + output.queries.withheldCount).toBe(1);
+    expect(output.latency.count).toBe(1);
+    expect(existsSync(reportPath)).toBe(true);
+  });
+
+  it('rejects a benchmark against a missing database', () => {
+    const benchmark = run(['benchmark', '--database', join(directory, 'missing.db')]);
+    expect(benchmark.code).toBe(1);
+    expect(benchmark.stderr).toContain('tidak ditemukan');
+  });
+
   it('does not write the application database when preparing an evaluation workspace', () => {
     const appDatabase = join(directory, 'app.db');
     expect(run(['migrate', '--database', appDatabase]).code).toBe(0);

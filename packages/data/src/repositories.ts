@@ -354,6 +354,74 @@ export function createCaseUnit(
   return unitId;
 }
 
+/**
+ * Retain one case unit with a known positive outcome. Retain never copies an
+ * estimate; the caller must supply the actual verdict outcome.
+ */
+export function retainCaseUnit(
+  db: DatabaseSync,
+  draft: CaseUnitDraft,
+  idFactory: () => string = randomUUID,
+): string {
+  const outcome = draft.actualSentenceDays;
+  if (
+    outcome === undefined ||
+    outcome === null ||
+    !Number.isInteger(outcome) ||
+    outcome <= 0
+  ) {
+    throw new ValidationError(
+      'retainCaseUnit requires a positive integer actualSentenceDays from the verdict',
+    );
+  }
+  return createCaseUnit(db, draft, idFactory);
+}
+
+/**
+ * Edit the known actual outcome of a case unit. `null` means the outcome is
+ * unknown again. The table trigger advances the case-base generation so an
+ * index built from the previous outcome is no longer usable.
+ */
+export function updateCaseUnitOutcome(
+  db: DatabaseSync,
+  caseUnitId: string,
+  actualSentenceDays: number | null,
+): void {
+  const id = requireText(caseUnitId, 'caseUnitId');
+  if (
+    actualSentenceDays !== null &&
+    (!Number.isInteger(actualSentenceDays) || actualSentenceDays < 0)
+  ) {
+    throw new ValidationError(
+      'actualSentenceDays must be a non-negative integer when known',
+    );
+  }
+
+  const result = db
+    .prepare(
+      `UPDATE case_unit
+          SET actual_sentence_days = ?,
+              updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+        WHERE id = ?`,
+    )
+    .run(actualSentenceDays, id);
+
+  if (result.changes === 0) {
+    throw new ValidationError(`unknown caseUnitId: ${id}`);
+  }
+}
+
+/**
+ * Delete a case unit. Child articles, attributes, and source links cascade.
+ * The generation trigger invalidates derived indexes; no case history is kept.
+ */
+export function deleteCaseUnit(db: DatabaseSync, caseUnitId: string): boolean {
+  const result = db
+    .prepare('DELETE FROM case_unit WHERE id = ?')
+    .run(requireText(caseUnitId, 'caseUnitId'));
+  return result.changes > 0;
+}
+
 /** Run a callback inside one immediate transaction. */
 export function withTransaction<T>(db: DatabaseSync, callback: () => T): T {
   db.exec('BEGIN IMMEDIATE');
