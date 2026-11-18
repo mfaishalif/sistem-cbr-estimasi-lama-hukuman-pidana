@@ -51,7 +51,10 @@ export class RetrievalConfigService {
         raw = JSON.parse(readFileSync(sourcePath, 'utf8'));
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        throw new Error(`Konfigurasi retrieval tidak dapat dibaca dari ${displayPath}: ${message}`);
+        throw new Error(
+          `Konfigurasi retrieval tidak dapat dibaca dari ${displayPath}: ${message}`,
+          { cause: error },
+        );
       }
       config = resolveRetrievalConfig(
         raw as Parameters<typeof resolveRetrievalConfig>[0],
