@@ -19,8 +19,10 @@ sumber dan kelompok perkara, memisahkan fakta dari hasil aktual, dan membatalkan
 indeks lama saat data berubah. Tidak ada verifikasi ahli atau riwayat versi;
 estimasi tidak pernah disimpan sebagai hasil aktual. Konfigurasi retrieval aktif
 dibaca dari [`config/retrieval.json`](config/retrieval.json) dan ditampilkan di
-UI, bukan diubah lewat angka tersembunyi. Pipeline evaluasi akhir dan laporan
-eksperimen tetap menjadi pekerjaan lanjutan. Rincian mesin dan benchmark:
+UI, bukan diubah lewat angka tersembunyi. Pipeline evaluasi sudah terhubung ke
+CLI: impor ke workspace terpisah, split kelompok, validasi grid, konfigurasi
+terkunci, dan penilaian test beserta pembanding. Hasil eksperimen Indo-Law tetap
+merupakan pekerjaan terpisah. Rincian mesin dan benchmark:
 [`docs/cbr/retrieve-reuse.md`](docs/cbr/retrieve-reuse.md).
 
 ## Prasyarat
@@ -114,7 +116,9 @@ untuk satu pengguna lokal.
 | Laporan impor | `./artifacts/import/import-report.json` di host | Ringkasan jumlah, alasan dilewati, kategori, kelengkapan atribut, dan waktu. Tidak memuat isi narasi. |
 | Laporan benchmark | `./artifacts/benchmark/retrieve-reuse.json` di host | Fase startup/rebuild, distribusi latensi pencarian, RAM proses, mesin, data, dan konfigurasi. Tidak memuat narasi. |
 | Workspace evaluasi | `./data/evaluation` di host, dipasang `/workspace` | Database evaluasi sendiri (`evaluation.db`), terpisah dari database aplikasi. |
-| Artefak evaluasi | `./artifacts/evaluation` di host, dipasang `/artifacts` | Ekspor laporan/artefak agar dapat dibaca dan dijalankan ulang. |
+| Artefak evaluasi | `./artifacts/evaluation` di host, dipasang `/artifacts` | Manifest, split, laporan validasi/test, dan konfigurasi terkunci. |
+| Workspace evaluasi fixture | `./data/evaluation-fixture` di host | Workspace terpisah untuk alur Docker pada fixture sintetis. |
+| Artefak evaluasi fixture | `./artifacts/evaluation-fixture` di host | Artefak fixture; bukan hasil evaluasi Indo-Law. |
 
 Periksa nama volume:
 
@@ -128,6 +132,7 @@ container non-root dapat menulisnya:
 
 ```bash
 mkdir -p data/raw data/evaluation artifacts/evaluation artifacts/import artifacts/benchmark
+mkdir -p data/evaluation-fixture artifacts/evaluation-fixture
 ```
 
 Pada Linux native, pastikan folder tersebut dapat ditulis oleh uid container
@@ -289,16 +294,84 @@ dan waktu pemrosesan. Laporan tidak memuat narasi, nama, atau nomor perkara.
 Rincian aturan ekstraksi, hasil uji snapshot penuh, dan batasnya:
 [`docs/import/indo-law-import.md`](docs/import/indo-law-import.md).
 
-### 3. Workspace evaluasi
+### 3. Evaluasi: impor, validasi, dan test terkunci
 
 ```bash
+# Alur penuh pada snapshot Indo-Law (membutuhkan data/raw/indo-law)
 docker compose --profile tools run --rm evaluate
 ```
 
-Evaluasi menyiapkan database evaluasi sendiri dan manifest di
-`artifacts/evaluation`; pipeline evaluasi CBR belum diimplementasikan.
+Perintah menjalankan tiga tahap pada database evaluasi sendiri di
+`data/evaluation/evaluation.db` dan menulis artefak ke
+`artifacts/evaluation/`:
 
-Batas yang sudah disiapkan:
+1. **prepare** mengimpor snapshot read-only, membangun split kelompok 70/15/15
+   dengan seed `indo-law-cbr-v1`, dan mencatat identitas snapshot, anggota serta
+   kelompok setiap split, konfigurasi, dan fingerprint di
+   `evaluation-manifest.json` dan `split-manifest.json`.
+2. **validate** memakai training saja untuk basis kasus, kosakata, IDF, skala
+   numerik, dan median pembanding. Grid 32 kombinasi yang disetujui dijalankan
+   pada validasi. Kandidat dengan cakupan minimal 90% dipilih berdasarkan MAE
+   terendah, lalu cakupan tertinggi, lalu urutan grid; bila target tidak
+   tercapai, cakupan tertinggi dipakai dan laporan menyatakan target belum
+   tercapai. Hasilnya ditulis ke `validation-report.json` dan konfigurasi
+   dikunci di `locked-config.json`. Test belum dibaca.
+3. **test** menolak berjalan bila manifest, snapshot, atau konfigurasi terkunci
+   tidak cocok. Setelah cocok, test menilai konfigurasi terkunci beserta dua
+   varian: narasi saja dengan Reuse berbobot dan input gabungan dengan agregasi
+   aritmetika tanpa bobot. Hasil dan pembanding median ditulis ke
+   `test-report.json`.
+
+Tahap dapat dipisah untuk pemeriksaan:
+
+```bash
+docker compose --profile tools run --rm evaluate --stage prepare
+docker compose --profile tools run --rm evaluate --stage validate
+docker compose --profile tools run --rm evaluate --stage test
+```
+
+Tanpa Docker:
+
+```bash
+node tools/cli/dist/index.js evaluate \
+  --source data/raw/indo-law \
+  --workspace data/evaluation \
+  --artifacts artifacts/evaluation \
+  --stage all
+```
+
+Detail per unit (termasuk referensi, skor, dan hasil aktual referensi) disimpan
+di `data/evaluation/validation-per-unit.jsonl` dan
+`data/evaluation/test-per-unit.jsonl`. Laporan ringkas tidak memuat narasi.
+
+Data validasi yang terlalu kecil (kurang dari 100 unit atau 50 kelompok, atau
+semua kandidat mengestimasi kurang dari 50 unit) membuat tuning ditunda dan test
+tetap terkunci. Kode keluar yang dapat diperiksa agent:
+
+| Kode | Arti |
+| --- | --- |
+| `0` | Tahap selesai. |
+| `1` | Kesalahan tak terduga. |
+| `2` | Input tidak valid (misalnya `--source` tidak ditemukan). |
+| `3` | Data tidak cukup; tuning ditunda atau split kosong. |
+| `4` | Manifest/konfigurasi terkunci tidak ada atau tidak cocok; jalankan ulang `prepare`/`validate`. |
+
+Kegagalan input/konfigurasi juga ditulis sebagai JSON di stderr dengan `code`
+dan `exitCode`.
+
+Alur Docker dapat diuji tanpa snapshot Indo-Law memakai fixture sintetis yang
+sudah dikomit:
+
+```bash
+docker compose --profile tools run --rm evaluate-fixture
+```
+
+Fixture memakai workspace `data/evaluation-fixture` dan artefak
+`artifacts/evaluation-fixture`, dengan ambang minimum yang diperkecil agar alur
+lengkap dapat berjalan pada 90 unit sintetis. Angka fixture bukan hasil
+evaluasi Indo-Law dan tidak boleh dilaporkan sebagai hasil tugas kuliah.
+
+Batas isolasi:
 
 - Sumber mentah dipasang read-only; impor besar hanya saat aplikasi berhenti.
 - Evaluasi tidak memasang volume database aplikasi dan memakai
@@ -314,14 +387,13 @@ docker compose up -d --build
 node scripts/verify-mount-isolation.mjs
 ```
 
-Skrip membandingkan hash `/data/app.db` sebelum/sesudah evaluasi dan memastikan
-`/data/app.db` tidak ada di container evaluasi.
+Skrip menjalankan alur evaluasi pada fixture, membandingkan hash `/data/app.db`
+sebelum/sesudah, dan memastikan `/data/app.db` tidak ada di container evaluasi.
 
 ### Fungsi pembagian dan metrik evaluasi
 
-`tools/cli/src/evaluation/` berisi fungsi murni yang nantinya dipakai perintah
-`evaluate` (integrasi impor, konfigurasi, dan test terkunci ada pada tiket CLI
-evaluasi):
+`tools/cli/src/evaluation/` memuat implementasi yang dipakai perintah
+`evaluate`:
 
 - `buildSplitManifest(units, { seed, proportions })` membagi training,
   validasi, dan test per kelompok perkara. Setiap unit masuk tepat sekali, satu
@@ -334,9 +406,13 @@ evaluasi):
   jumlah estimasi diterima/ditahan beserta alasannya, cakupan, dan pembanding
   median pada unit yang persis sama maupun seluruh unit layak. Penyebut nol
   menghasilkan status `unavailable`, bukan `0` atau `NaN`.
+- `buildEvaluationCandidates()` menghasilkan grid 32 kombinasi, sedangkan
+  `selectValidationCandidate` menerapkan aturan pemilihan dan seri. Keduanya
+  hanya menerima data validasi; target test tidak pernah dipakai untuk memilih.
+- `pipeline.ts` menyatukan impor, split, validasi, kunci, dan test, termasuk
+  fingerprint manifest/prediksi untuk pemeriksaan reproduksibilitas.
 
-Seed, proporsi akhir, ambang, dan konfigurasi produksi tetap menjadi parameter
-pemanggil sampai keputusan konfigurasi evaluasi ditetapkan. Perintah pengujian:
+Perintah pengujian:
 
 ```bash
 npm run test:evaluation
@@ -374,9 +450,10 @@ apps/api        NestJS: HTTP /api, menyajikan build frontend
 packages/cbr    Mesin Retrieve–Reuse: model, kontrak, TF-IDF, atribut, indeks, reuse
 packages/data   Akses SQLite, migrasi, repository, adapter snapshot CBR
 tools/importer  Akuisisi snapshot, parsing XML, ekstraksi, normalisasi, laporan impor
-tools/cli       Migrasi, status, create-case, impor, benchmark, workspace evaluasi
+tools/cli       Migrasi, status, create-case, impor, benchmark, pipeline evaluasi
 docker/         Entrypoint image
-scripts/        Pemeriksaan operasional
+scripts/        Pemeriksaan operasional dan generator fixture evaluasi
+fixtures/       Snapshot Indo-Law sintetis untuk alur Docker evaluasi
 ```
 
 Batas tanggung jawab: API, impor, evaluasi, dan benchmark memakai implementasi
@@ -412,5 +489,11 @@ dilepas; bila build gagal, estimasi ditahan, bukan diisi dengan hasil basi.
    impor dan pastikan jumlah unit tidak bertambah dua kali.
 8. Benchmark: jalankan perintah `benchmark` pada database hasil impor dan
    pastikan laporan memisahkan fase startup/rebuild dari latensi pencarian.
-9. Isolasi mount: jalankan `node scripts/verify-mount-isolation.mjs` dan
-   pastikan hash database aplikasi tidak berubah.
+9. Evaluasi pada fixture: buat folder `data/evaluation-fixture` dan
+   `artifacts/evaluation-fixture`, lalu jalankan
+   `docker compose --profile tools run --rm --build evaluate-fixture`. Pastikan
+   `evaluation-manifest.json`, `split-manifest.json`, `validation-report.json`,
+   `locked-config.json`, dan `test-report.json` terbentuk. Jalankan ulang
+   layanan yang sama; fingerprint prediksi di `test-report.json` harus sama.
+10. Isolasi mount: jalankan `node scripts/verify-mount-isolation.mjs` dan
+    pastikan hash database aplikasi tidak berubah.

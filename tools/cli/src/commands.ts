@@ -12,6 +12,12 @@ import {
 import { runImport } from '@cbr/importer';
 import type { ParsedArgs } from './args';
 import { runBenchmark } from './benchmark';
+import {
+  EvaluationError,
+  runEvaluation,
+  type EvaluationStage,
+} from './evaluation/pipeline';
+import type { SplitProportions } from './evaluation/split';
 
 export interface CliIO {
   stdout: (line: string) => void;
@@ -31,7 +37,7 @@ Perintah:
   create-case   Tambah satu unit kasus dari JSON (--file <path> atau --json <json>).
   import        Impor dan normalisasi basis kasus dari snapshot sumber (--source <dir>).
   benchmark     Ukur latensi Retrieve-Reuse, pembangunan indeks, dan RAM.
-  evaluate      Siapkan workspace evaluasi terpisah (pipeline evaluasi belum diimplementasikan).
+  evaluate      Impor snapshot, validasi konfigurasi, dan nilai test pada workspace terpisah.
   help          Tampilkan bantuan ini.
 
 Opsi umum:
@@ -47,13 +53,25 @@ Opsi benchmark:
   --warmup <n>        Pencarian pemanasan yang tidak diukur. Default: 5.
   --report <path>     Tulis laporan benchmark ke JSON.
 
+Opsi evaluasi:
+  --workspace <dir>   Direktori kerja evaluasi (wajib).
+  --artifacts <dir>   Direktori artefak. Default: <workspace>/artifacts.
+  --stage <tahap>     prepare, validate, test, atau all. Default: all.
+  --source <dir>      Direktori snapshot untuk prepare (dipasang read-only).
+  --seed <teks>       Seed split. Default: indo-law-cbr-v1.
+  --proportions <a,b,c>  Proporsi training,validasi,test. Default: 0.7,0.15,0.15.
+  --limit <n>         Batasi jumlah XML saat impor evaluasi.
+  --min-validation-units <n>     Minimum unit validasi. Default: 100.
+  --min-validation-groups <n>    Minimum kelompok validasi. Default: 50.
+  --min-candidate-estimates <n>  Minimum estimasi per kandidat. Default: 50.
+
 Contoh:
   cbr migrate --database /data/app.db
   cbr status --database /data/app.db
   cbr create-case --file case.json
   cbr import --source /sources/indo-law --database /data/app.db
   cbr benchmark --database /data/app.db --queries 200 --report artifacts/benchmark.json
-  cbr evaluate --workspace /workspace --artifacts /artifacts
+  cbr evaluate --source /sources/indo-law --workspace /workspace --artifacts /artifacts --stage all
 `;
 
 function databasePath(parsed: ParsedArgs, environment: CliEnvironment): string {
@@ -238,11 +256,79 @@ function commandBenchmark(
   return 0;
 }
 
+const EVALUATION_STAGES: readonly EvaluationStage[] = [
+  'prepare',
+  'validate',
+  'test',
+  'all',
+];
+
+function evaluationStage(value: string | undefined): EvaluationStage {
+  if (value === undefined) {
+    return 'all';
+  }
+  if (!EVALUATION_STAGES.includes(value as EvaluationStage)) {
+    throw new EvaluationError(
+      'INPUT_TIDAK_VALID',
+      `--stage harus salah satu dari: ${EVALUATION_STAGES.join(', ')}.`,
+      { stage: value },
+    );
+  }
+  return value as EvaluationStage;
+}
+
+function splitProportions(value: string | undefined): SplitProportions | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const parts = value.split(',').map((part) => Number(part.trim()));
+  if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) {
+    throw new EvaluationError(
+      'INPUT_TIDAK_VALID',
+      '--proportions harus berisi tiga angka: training,validasi,test.',
+      { value },
+    );
+  }
+  return {
+    training: parts[0] as number,
+    validation: parts[1] as number,
+    test: parts[2] as number,
+  };
+}
+
+function evaluationInteger(
+  value: string | undefined,
+  label: string,
+  min: number,
+): number | undefined {
+  try {
+    return integerOption(value, label, min);
+  } catch (error) {
+    throw new EvaluationError(
+      'INPUT_TIDAK_VALID',
+      error instanceof Error ? error.message : String(error),
+      { option: label, value },
+    );
+  }
+}
+
 function commandEvaluate(parsed: ParsedArgs, io: CliIO, environment: CliEnvironment): number {
   const workspaceFlag = parsed.flags.workspace;
   if (workspaceFlag === undefined) {
-    io.stderr('evaluate memerlukan --workspace <direktori kerja evaluasi>.');
-    return 1;
+    io.stderr(
+      JSON.stringify(
+        {
+          status: 'error',
+          code: 'INPUT_TIDAK_VALID',
+          message: 'evaluate memerlukan --workspace <direktori kerja evaluasi>.',
+          exitCode: 2,
+          details: null,
+        },
+        null,
+        2,
+      ),
+    );
+    return 2;
   }
 
   const workspace = resolve(environment.cwd, workspaceFlag);
@@ -250,31 +336,53 @@ function commandEvaluate(parsed: ParsedArgs, io: CliIO, environment: CliEnvironm
     environment.cwd,
     parsed.flags.artifacts ?? join(workspace, 'artifacts'),
   );
-  mkdirSync(workspace, { recursive: true });
-  mkdirSync(artifacts, { recursive: true });
 
-  const evaluationDatabase = join(workspace, 'evaluation.db');
-  const db = openDatabase(evaluationDatabase);
   try {
-    const migrations = runMigrations(db);
-    const manifest = {
-      status: 'not_implemented',
-      note: 'Pipeline evaluasi CBR belum diimplementasikan. Perintah ini hanya menyiapkan workspace evaluasi terpisah.',
-      createdAt: new Date().toISOString(),
-      evaluationDatabase,
+    const sourceFlag = parsed.flags.source;
+    const result = runEvaluation({
+      workspace,
       artifacts,
-      schemaVersion: migrations.schemaVersion,
-      appliedMigrations: migrations.applied,
-      applicationDatabase:
-        'database aplikasi tidak dipasang pada layanan evaluasi (lihat compose.yaml)',
-    };
-
-    const manifestPath = join(artifacts, 'evaluation-manifest.json');
-    writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
-    print(io, { ...manifest, manifestPath });
-    return 0;
-  } finally {
-    closeDatabase(db);
+      stage: evaluationStage(parsed.flags.stage),
+      sourceDir: sourceFlag === undefined ? undefined : resolve(environment.cwd, sourceFlag),
+      seed: parsed.flags.seed,
+      proportions: splitProportions(parsed.flags.proportions),
+      limit: evaluationInteger(parsed.flags.limit, '--limit', 1),
+      minValidationUnits: evaluationInteger(
+        parsed.flags['min-validation-units'],
+        '--min-validation-units',
+        0,
+      ),
+      minValidationGroups: evaluationInteger(
+        parsed.flags['min-validation-groups'],
+        '--min-validation-groups',
+        0,
+      ),
+      minCandidateEstimates: evaluationInteger(
+        parsed.flags['min-candidate-estimates'],
+        '--min-candidate-estimates',
+        0,
+      ),
+    });
+    print(io, result);
+    return result.exitCode;
+  } catch (error) {
+    if (error instanceof EvaluationError) {
+      io.stderr(
+        JSON.stringify(
+          {
+            status: 'error',
+            code: error.code,
+            message: error.message,
+            exitCode: error.exitCode,
+            details: error.details ?? null,
+          },
+          null,
+          2,
+        ),
+      );
+      return error.exitCode;
+    }
+    throw error;
   }
 }
 

@@ -73,9 +73,9 @@ try {
       '-T',
       '--entrypoint',
       'sh',
-      'evaluate',
+      'evaluate-fixture',
       '-c',
-      'if [ -e /data/app.db ]; then echo "app database is mounted in evaluate" >&2; exit 1; fi; node tools/cli/dist/index.js evaluate --workspace /workspace --artifacts /artifacts',
+      'if [ -e /data/app.db ]; then echo "app database is mounted in evaluate" >&2; exit 1; fi; node tools/cli/dist/index.js evaluate --stage all --source /fixture --workspace /workspace --artifacts /artifacts --min-validation-units 8 --min-validation-groups 8 --min-candidate-estimates 0',
     ],
     { capture: true },
   );

@@ -9,9 +9,14 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { parseArgs } from './args';
 import { runCli, type CliEnvironment } from './commands';
+
+const FIXTURE = fileURLToPath(
+  new URL('../../../fixtures/indo-law-synthetic', import.meta.url),
+);
 
 let directory: string;
 
@@ -161,23 +166,121 @@ describe('cli', () => {
     expect(benchmark.stderr).toContain('tidak ditemukan');
   });
 
-  it('does not write the application database when preparing an evaluation workspace', () => {
+  it('prepares an evaluation workspace without writing the application database', () => {
     const appDatabase = join(directory, 'app.db');
     expect(run(['migrate', '--database', appDatabase]).code).toBe(0);
     const before = createHash('sha256').update(readFileSync(appDatabase)).digest('hex');
 
     const workspace = join(directory, 'evaluation-workspace');
     const artifacts = join(directory, 'evaluation-artifacts');
-    const evaluated = run(['evaluate', '--workspace', workspace, '--artifacts', artifacts]);
+    const evaluated = run([
+      'evaluate',
+      '--stage',
+      'prepare',
+      '--source',
+      FIXTURE,
+      '--workspace',
+      workspace,
+      '--artifacts',
+      artifacts,
+      '--limit',
+      '12',
+    ]);
 
     expect(evaluated.code).toBe(0);
-    const output = JSON.parse(evaluated.stdout) as { status: string; manifestPath: string };
-    expect(output.status).toBe('not_implemented');
+    const output = JSON.parse(evaluated.stdout) as {
+      status: string;
+      manifestPath: string;
+      splitManifestPath: string;
+      counts: { units: number };
+    };
+    expect(output.status).toBe('prepared');
+    expect(output.counts.units).toBe(12);
     expect(existsSync(join(workspace, 'evaluation.db'))).toBe(true);
     expect(existsSync(output.manifestPath)).toBe(true);
+    expect(existsSync(output.splitManifestPath)).toBe(true);
     expect(
       createHash('sha256').update(readFileSync(appDatabase)).digest('hex'),
     ).toBe(before);
+  });
+
+  it('runs validation and the locked test from the CLI', () => {
+    const workspace = join(directory, 'evaluation-workspace');
+    const artifacts = join(directory, 'evaluation-artifacts');
+    const common = [
+      'evaluate',
+      '--source',
+      FIXTURE,
+      '--workspace',
+      workspace,
+      '--artifacts',
+      artifacts,
+      '--min-validation-units',
+      '8',
+      '--min-validation-groups',
+      '8',
+      '--min-candidate-estimates',
+      '0',
+    ];
+
+    expect(run([...common, '--stage', 'prepare']).code).toBe(0);
+
+    const validated = run([...common, '--stage', 'validate']);
+    expect(validated.code).toBe(0);
+    const validationOutput = JSON.parse(validated.stdout) as {
+      status: string;
+      lockPath: string;
+      selected: { id: string };
+    };
+    expect(validationOutput.status).toBe('validated');
+    expect(validationOutput.selected.id).toMatch(/^kandidat-\d{2}$/);
+    expect(existsSync(validationOutput.lockPath)).toBe(true);
+
+    const tested = run([...common, '--stage', 'test']);
+    expect(tested.code).toBe(0);
+    const testOutput = JSON.parse(tested.stdout) as {
+      status: string;
+      models: Array<{ id: string }>;
+    };
+    expect(testOutput.status).toBe('tested');
+    expect(testOutput.models).toHaveLength(3);
+  });
+
+  it('reports input and lock failures with agent-checkable exit codes', () => {
+    const workspace = join(directory, 'evaluation-workspace');
+    const artifacts = join(directory, 'evaluation-artifacts');
+
+    const missingSource = run([
+      'evaluate',
+      '--stage',
+      'prepare',
+      '--source',
+      join(directory, 'missing-source'),
+      '--workspace',
+      workspace,
+      '--artifacts',
+      artifacts,
+    ]);
+    expect(missingSource.code).toBe(2);
+    expect(JSON.parse(missingSource.stderr)).toMatchObject({
+      code: 'INPUT_TIDAK_VALID',
+      exitCode: 2,
+    });
+
+    const missingManifest = run([
+      'evaluate',
+      '--stage',
+      'validate',
+      '--workspace',
+      workspace,
+      '--artifacts',
+      artifacts,
+    ]);
+    expect(missingManifest.code).toBe(4);
+    expect(JSON.parse(missingManifest.stderr)).toMatchObject({
+      code: 'MANIFEST_TIDAK_ADA',
+      exitCode: 4,
+    });
   });
 
   it('imports a snapshot and writes a report', () => {

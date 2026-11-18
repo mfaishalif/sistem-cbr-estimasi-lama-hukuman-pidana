@@ -64,6 +64,9 @@ export function fitTermModel(
   const documentCount = documents.length;
   const idf = new Map<string, number>();
   for (const [term, frequency] of documentFrequency) {
+    if (frequency < preprocessing.minDocumentFrequency) {
+      continue;
+    }
     idf.set(
       term,
       preprocessing.smoothInverseDocumentFrequency
