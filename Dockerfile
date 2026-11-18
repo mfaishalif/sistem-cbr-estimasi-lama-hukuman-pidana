@@ -14,6 +14,7 @@ COPY apps/web/package.json apps/web/package.json
 COPY apps/api/package.json apps/api/package.json
 COPY packages/cbr/package.json packages/cbr/package.json
 COPY packages/data/package.json packages/data/package.json
+COPY tools/importer/package.json tools/importer/package.json
 COPY tools/cli/package.json tools/cli/package.json
 RUN npm ci
 
@@ -30,6 +31,7 @@ COPY apps/web/package.json apps/web/package.json
 COPY apps/api/package.json apps/api/package.json
 COPY packages/cbr/package.json packages/cbr/package.json
 COPY packages/data/package.json packages/data/package.json
+COPY tools/importer/package.json tools/importer/package.json
 COPY tools/cli/package.json tools/cli/package.json
 RUN npm ci --omit=dev
 
@@ -46,6 +48,8 @@ COPY --from=build /app/packages/cbr/package.json ./packages/cbr/package.json
 COPY --from=build /app/packages/cbr/dist ./packages/cbr/dist
 COPY --from=build /app/packages/data/package.json ./packages/data/package.json
 COPY --from=build /app/packages/data/dist ./packages/data/dist
+COPY --from=build /app/tools/importer/package.json ./tools/importer/package.json
+COPY --from=build /app/tools/importer/dist ./tools/importer/dist
 COPY --from=build /app/tools/cli/package.json ./tools/cli/package.json
 COPY --from=build /app/tools/cli/dist ./tools/cli/dist
 COPY --from=build /app/apps/api/package.json ./apps/api/package.json

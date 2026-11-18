@@ -41,10 +41,18 @@ services:
     <<: *app
     profiles: ["tools"]
     entrypoint: ["node", "tools/cli/dist/index.js"]
-    command: ["import", "--source", "/sources", "--database", "/data/app.db"]
+    command:
+      - import
+      - --source
+      - /sources/indo-law
+      - --database
+      - /data/app.db
+      - --report
+      - /artifacts/import-report.json
     volumes:
       - app-data:/data
       - ./data/raw:/sources:ro
+      - ./artifacts/import:/artifacts
 
   # Evaluation uses its own workspace and database. The application database
   # volume is deliberately not mounted here. Raw sources are read-only.

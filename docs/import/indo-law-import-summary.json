@@ -1,0 +1,96 @@
+{
+  "status": "ok",
+  "schemaVersion": "002",
+  "source": {
+    "repository": "ir-nlp-csui/indo-law",
+    "commit": "67340338adbc63021630947d905627eef0d7e43f",
+    "datasetTree": "14db967106b2d10c968d73d7b061774b81f508c8",
+    "archiveSha256": "d033322c4086bfc3d688a8fef4f79a2dd912789a3db95874876d4f169847d124",
+    "filesFound": 22630,
+    "filesRead": 22630,
+    "bytesRead": 1230556735,
+    "manifestVerified": true
+  },
+  "counts": {
+    "documentsParsed": 22630,
+    "documentsSkipped": 0,
+    "casesAccepted": 5782,
+    "casesSkipped": 16832,
+    "caseGroups": 5773,
+    "sourceDocuments": 22594,
+    "sourceAliases": 67890,
+    "copiesMerged": 36,
+    "relatedGroupsMerged": 7,
+    "conflicts": 0
+  },
+  "skipReasons": {
+    "case_number_missing": 419,
+    "defendant_identity_missing": 808,
+    "multiple_defendants": 1316,
+    "narrative_contains_outcome": 1588,
+    "narrative_not_separable": 15,
+    "narrative_too_short": 291,
+    "not_general_criminal_case": 10861,
+    "outcome_conflict": 209,
+    "outcome_not_positive": 365,
+    "special_law_charge": 960
+  },
+  "categories": {
+    "pemalsuan": 100,
+    "pencurian": 1639,
+    "penipuan": 811,
+    "penggelapan": 886,
+    "penadahan": 138,
+    "pembunuhan": 192,
+    "penganiayaan": 221,
+    "kejahatan-terhadap-keamanan-negara": 128,
+    "mata-uang": 6,
+    "pemerasan-dan-pengancaman": 39,
+    "kejahatan-terhadap-kesusilaan": 32,
+    "penghinaan": 154,
+    "kealfaan-mengakibatkan-kematianluka": 37,
+    "perusakan": 13,
+    "perjudian": 17,
+    "kejahatan-terhadap-keteriban-umum": 14,
+    "lalu-lintas": 9,
+    "kejahatan-terhadap-kemerdekaan-orang-lain": 2,
+    "senjata-api": 5,
+    "kehutanan": 4
+  },
+  "categoryUnknown": 1335,
+  "attributes": {
+    "age_years": { "present": 907, "total": 5782 },
+    "age_reference_date": { "present": 907, "total": 5782 },
+    "gender": { "present": 3306, "total": 5782 },
+    "occupation": { "present": 4240, "total": 5782 },
+    "education": { "present": 1124, "total": 5782 },
+    "role": { "present": 26, "total": 5782 },
+    "victim_count": { "present": 1, "total": 5782 },
+    "victim_harm": { "present": 398, "total": 5782 },
+    "loss_amount_idr": { "present": 1085, "total": 5782 },
+    "weapon_or_mode": { "present": 1783, "total": 5782 },
+    "prior_conviction": { "present": 1112, "total": 5782 }
+  },
+  "outcomes": {
+    "metadataOnly": 608,
+    "metadataAndVerdict": 5174
+  },
+  "grouping": {
+    "largestGroup": 2,
+    "relatedLinks": 7,
+    "relatedGroupsMerged": 7
+  },
+  "timing": {
+    "discoveryMs": 120,
+    "parseMs": 28280,
+    "extractionMs": 34774,
+    "writeMs": 12312,
+    "totalMs": 81456
+  },
+  "environment": {
+    "node": "24.20.0",
+    "platform": "win32",
+    "date": "2026-11-18",
+    "note": "One local run; timings are not a benchmark."
+  }
+}

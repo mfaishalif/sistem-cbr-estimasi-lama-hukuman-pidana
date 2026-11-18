@@ -147,5 +147,7 @@ export interface DatabaseStatus {
   schemaVersion: string | null;
   caseUnits: number;
   caseGroups: number;
+  sourceDocuments: number;
+  sourceAliases: number;
   generation: number;
 }

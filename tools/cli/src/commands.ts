@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import type { CaseUnitDraft } from '@cbr/core';
 import {
   createCaseUnit,
@@ -9,6 +9,7 @@ import {
   runMigrations,
   closeDatabase,
 } from '@cbr/data';
+import { runImport } from '@cbr/importer';
 import type { ParsedArgs } from './args';
 
 export interface CliIO {
@@ -27,17 +28,23 @@ Perintah:
   migrate       Terapkan migrasi yang belum dijalankan.
   status        Tampilkan versi skema, jumlah unit kasus, dan generasi basis kasus.
   create-case   Tambah satu unit kasus dari JSON (--file <path> atau --json <json>).
-  import        Impor basis kasus dari sumber mentah (belum diimplementasikan).
+  import        Impor dan normalisasi basis kasus dari snapshot sumber (--source <dir>).
   evaluate      Siapkan workspace evaluasi terpisah (pipeline evaluasi belum diimplementasikan).
   help          Tampilkan bantuan ini.
 
 Opsi umum:
   --database <path>   Lokasi SQLite. Default: DATABASE_PATH atau ./data/app.db.
 
+Opsi impor:
+  --source <dir>      Direktori snapshot (berisi manifest.json dan dataset/) atau direktori XML.
+  --report <path>     Lokasi laporan JSON. Default: <folder database>/import-report.json.
+  --limit <n>         Batasi jumlah XML yang diproses (untuk pemeriksaan).
+
 Contoh:
   cbr migrate --database /data/app.db
   cbr status --database /data/app.db
   cbr create-case --file case.json
+  cbr import --source /sources/indo-law --database /data/app.db
   cbr evaluate --workspace /workspace --artifacts /artifacts
 `;
 
@@ -131,7 +138,7 @@ function commandCreateCase(
 function commandImport(parsed: ParsedArgs, io: CliIO, environment: CliEnvironment): number {
   const sourceFlag = parsed.flags.source;
   if (sourceFlag === undefined) {
-    io.stderr('import memerlukan --source <direktori sumber mentah>.');
+    io.stderr('import memerlukan --source <direktori snapshot sumber>.');
     return 1;
   }
 
@@ -141,16 +148,31 @@ function commandImport(parsed: ParsedArgs, io: CliIO, environment: CliEnvironmen
     return 1;
   }
 
-  io.stderr(
-    [
-      'Impor basis kasus belum diimplementasikan pada tiket fondasi.',
-      `Sumber (read-only): ${source}`,
-      `Database tujuan: ${databasePath(parsed, environment)}`,
-      'Tidak ada data yang ditulis oleh perintah ini.',
-      'Tiket impor akan mengisi ekstraksi, validasi, dan laporan kelolosan.',
-    ].join('\n'),
-  );
-  return 2;
+  let limit: number | undefined;
+  if (parsed.flags.limit !== undefined) {
+    limit = Number.parseInt(parsed.flags.limit, 10);
+    if (!Number.isSafeInteger(limit) || limit < 1) {
+      io.stderr('--limit harus berupa bilangan bulat positif.');
+      return 1;
+    }
+  }
+
+  const database = databasePath(parsed, environment);
+  const reportPath =
+    parsed.flags.report === undefined
+      ? join(dirname(database), 'import-report.json')
+      : resolve(environment.cwd, parsed.flags.report);
+
+  const report = runImport({
+    sourceDir: source,
+    databasePath: database,
+    reportPath,
+    limit,
+    replace: true,
+  });
+
+  print(io, { ...report, reportPath });
+  return 0;
 }
 
 function commandEvaluate(parsed: ParsedArgs, io: CliIO, environment: CliEnvironment): number {

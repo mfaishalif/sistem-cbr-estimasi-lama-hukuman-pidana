@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@cbr/core": "0.1.0",
-    "@cbr/data": "0.1.0"
+    "@cbr/data": "0.1.0",
+    "@cbr/importer": "0.1.0"
   }
 }

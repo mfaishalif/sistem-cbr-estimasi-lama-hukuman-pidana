@@ -1,0 +1,19 @@
+{
+  "name": "@cbr/importer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Indo-Law source acquisition, case extraction, normalization, and import reporting",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@cbr/core": "0.1.0",
+    "@cbr/data": "0.1.0",
+    "fast-xml-parser": "5.12.1"
+  }
+}
