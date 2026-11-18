@@ -22,7 +22,6 @@ import {
 import type { AttributeComponentConfig, RetrievalConfig } from './config';
 import type {
   CandidateSummary,
-  CaseBaseCase,
   EstimateRequest,
   EstimateResult,
   EstimateScoringSummary,
