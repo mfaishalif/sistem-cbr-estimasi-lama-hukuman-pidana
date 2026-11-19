@@ -79,8 +79,8 @@ estimasi sebagai hasil aktual; isi hasil aktual hanya dari putusan yang sudah
 diketahui.
 
 1. Jalankan `docker compose up --build`, lalu buka <http://localhost:3000>.
-   Tautan **Cara kerja** di header menjelaskan alur 4R. Bila indeks belum siap,
-   panel hasil menampilkan keterangannya.
+   Tautan **Cara kerja** di header menjelaskan alur 4R, rumus, dan bobot
+   aplikasi. Bila indeks belum siap, panel hasil menampilkan keterangannya.
 2. Buka **Basis kasus** → **Tambah perkara**. Tambahkan dua atau tiga perkara
    sintetis dengan pengadilan, nomor perkara, kronologi pra-putusan, kategori
    yang sama (misalnya Pencurian), dan putusan aktual yang berbeda (misalnya 8
@@ -587,8 +587,9 @@ dilepas; bila build gagal, estimasi ditahan, bukan diisi dengan hasil basi.
 1. `npm ci && npm run typecheck && npm test && npm run build`
 2. `docker compose up --build`, lalu buka `http://localhost:3000` dan
    `http://localhost:3000/api/health`. Drawer **Cara kerja** menjelaskan alur
-   4R dan hasil evaluasi. Cek fingerprint dan sumber `config/retrieval.json` lewat
-   `/api/config`, serta status indeks lewat `/api/index/status`.
+   4R, rumus, dan bobot aplikasi. Cek fingerprint dan sumber
+   `config/retrieval.json` lewat `/api/config`, serta status indeks lewat
+   `/api/index/status`.
 3. Migrasi database kosong: hapus volume **hanya untuk pemeriksaan** dengan
    `docker compose down -v`, lalu `docker compose up --build`; status skema
    harus `002`.

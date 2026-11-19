@@ -6,6 +6,7 @@ import {
   detailSummary,
   draftFromFacts,
   emptyCaseForm,
+  fillSample,
   newArticleRow,
   parseSentenceInput,
   validateIdentity,
@@ -90,6 +91,38 @@ describe('buildFacts', () => {
     const errors: FieldError[] = [];
     buildFacts({ ...emptyCaseForm(), narration: 'x', victimCount: '1,5' }, errors);
     expect(errors.map((error) => error.field)).toEqual(['victim-count']);
+  });
+});
+
+describe('fillSample', () => {
+  it('fills the sample narration, category, and one article while keeping other details', () => {
+    const form = {
+      ...emptyCaseForm(),
+      gender: 'laki-laki',
+      ageYears: '30',
+      articles: [newArticleRow({ article: '362' }), newArticleRow({ article: '364' })],
+    };
+    const filled = fillSample(form, 'kronologi contoh');
+
+    expect(filled.narration).toBe('kronologi contoh');
+    expect(filled.category).toBe('pencurian');
+    expect(filled.gender).toBe('laki-laki');
+    expect(filled.ageYears).toBe('30');
+    expect(filled.articles).toHaveLength(1);
+    expect(filled.articles[0]).toMatchObject({
+      law: 'KUHP',
+      article: '363',
+      paragraph: '1',
+      arrangement: 'primary',
+    });
+  });
+
+  it('replaces the article row again when clicked twice', () => {
+    const once = fillSample(emptyCaseForm(), 'kronologi contoh');
+    const twice = fillSample(once, 'kronologi contoh');
+
+    expect(twice.articles).toHaveLength(1);
+    expect(twice.articles[0]).toMatchObject({ article: '363', paragraph: '1' });
   });
 });
 

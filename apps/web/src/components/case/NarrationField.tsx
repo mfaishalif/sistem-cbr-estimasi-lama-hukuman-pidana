@@ -2,6 +2,7 @@ import { Field, describedBy } from '@/components/ui/field';
 import { Textarea } from '@/components/ui/textarea';
 import { errorFor } from '@/components/ui/error-summary';
 import { Hint } from '@/components/ui/label';
+import { fillSample } from '@/lib/case-form';
 import { copy } from '@/lib/copy';
 import { countWords, formatInteger } from '@/lib/format';
 import { span } from './layout';
@@ -37,7 +38,7 @@ export function NarrationField({ idPrefix, form, patch, errors, disabled, withSa
             <button
               type="button"
               className="min-h-11 text-accent underline underline-offset-4 hover:text-accent-hover sm:min-h-0"
-              onClick={() => patch({ narration: copy.estimate.sample, category: form.category || 'pencurian' })}
+              onClick={() => patch(fillSample(form, copy.estimate.sample))}
               disabled={disabled}
             >
               {copy.estimate.fillSample}
