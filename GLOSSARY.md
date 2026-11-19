@@ -31,6 +31,9 @@ Keadaan ketika mesin tidak menghasilkan angka estimasi karena syarat kelayakan t
 **Cakupan estimasi**:
 Proporsi unit layak yang memperoleh angka estimasi. Unit tanpa hasil aktual positif yang diketahui tidak masuk penyebut.
 
+**Cakupan komponen opsional**:
+Proporsi bobot isian opsional kasus baru yang dapat dibandingkan dengan satu kasus referensi, terhadap total bobot isian opsional yang diketahui pada kasus baru.
+
 **Pembanding median**:
 Nilai median hasil aktual training secara keseluruhan atau per kategori yang dipakai sebagai pembanding sederhana. Kategori yang tidak ditemukan di training memakai median keseluruhan.
 
@@ -53,7 +56,7 @@ Tahap pencarian dan pemilihan kasus historis yang memiliki kemiripan fakta denga
 Tahap menghasilkan estimasi lama hukuman untuk kasus baru berdasarkan hasil aktual kasus referensi yang dipilih melalui Retrieve.
 
 **Revise**:
-Tahap penyesuaian hasil penyelesaian kasus baru menggunakan hasil aktual setelah estimasi dihasilkan melalui Reuse.
+Tahap mencatat hasil aktual kasus baru dan menghitung selisih terhadap estimasi lama hukuman jika angka estimasi tersedia.
 
 **Retain**:
 Tahap penambahan kasus baru beserta hasil aktualnya ke basis kasus sebagai pengalaman untuk estimasi berikutnya.
