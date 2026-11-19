@@ -1058,6 +1058,8 @@ export function validateEvaluation(options: EvaluationOptions): EvaluationStageR
         cbr: run.report.cbr,
         baselineOnAcceptedUnits: run.report.baselineOnAcceptedUnits,
         baselineOnEligibleUnits: run.report.baselineOnEligibleUnits,
+        overallMedianOnAcceptedUnits: run.report.overallMedianOnAcceptedUnits,
+        overallMedianOnEligibleUnits: run.report.overallMedianOnEligibleUnits,
         withheldReasons: run.report.withheldReasons,
         perCategory: run.report.perCategory,
       })),
@@ -1298,6 +1300,7 @@ export function testEvaluation(options: EvaluationOptions): EvaluationStageResul
       model: modelReports[index]?.id,
       cbr: report.cbr,
       baselineOnAcceptedUnits: report.baselineOnAcceptedUnits,
+      overallMedianOnAcceptedUnits: report.overallMedianOnAcceptedUnits,
     };
   });
 
@@ -1366,6 +1369,8 @@ export function testEvaluation(options: EvaluationOptions): EvaluationStageResul
       cbr: model.report.cbr,
       baselineOnAcceptedUnits: model.report.baselineOnAcceptedUnits,
       baselineOnEligibleUnits: model.report.baselineOnEligibleUnits,
+      overallMedianOnAcceptedUnits: model.report.overallMedianOnAcceptedUnits,
+      overallMedianOnEligibleUnits: model.report.overallMedianOnEligibleUnits,
     })),
     paired: report.paired,
     unitDetailsPath: perUnitPath,

@@ -124,6 +124,10 @@ describe('evaluation pipeline', () => {
     }>(join(opts.artifacts, 'validation-report.json'));
 
     expect(validation.grid.candidates).toHaveLength(32);
+    expect(validation.grid.candidates[0]).toMatchObject({
+      overallMedianOnAcceptedUnits: { status: 'available' },
+      overallMedianOnEligibleUnits: { status: 'available' },
+    });
     expect(validation.selected.id).toBe(lock.selected.id);
     expect(validation.selected.configFingerprint).toBe(lock.configFingerprint);
     expect(validation.manifestFingerprint).toBe(lock.manifestFingerprint);
@@ -166,6 +170,20 @@ describe('evaluation pipeline', () => {
       'unweighted',
     ]);
     expect(testReport.paired.models).toHaveLength(3);
+    expect(testReport.paired.models[0]).toMatchObject({
+      overallMedianOnAcceptedUnits: { unitCount: testReport.paired.unitCount },
+    });
+    expect(testReport.models[0]?.report).toMatchObject({
+      overallMedianOnAcceptedUnits: { status: 'available' },
+      overallMedianOnEligibleUnits: { status: 'available' },
+    });
+    expect(tested).toMatchObject({
+      models: testReport.models.map((model) => ({
+        id: model.id,
+        overallMedianOnAcceptedUnits: { status: 'available' },
+        overallMedianOnEligibleUnits: { status: 'available' },
+      })),
+    });
     expect(testReport.models.every((model) => model.report.coverage.status === 'available')).toBe(
       true,
     );

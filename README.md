@@ -21,9 +21,9 @@ estimasi tidak pernah disimpan sebagai hasil aktual. Konfigurasi retrieval aktif
 dibaca dari [`config/retrieval.json`](config/retrieval.json) dan ditampilkan di
 UI, bukan diubah lewat angka tersembunyi. Pipeline evaluasi sudah terhubung ke
 CLI: impor ke workspace terpisah, split kelompok, validasi grid, konfigurasi
-terkunci, dan penilaian test beserta pembanding. Hasil eksperimen Indo-Law tetap
-merupakan pekerjaan terpisah. Rincian mesin dan benchmark:
-[`docs/cbr/retrieve-reuse.md`](docs/cbr/retrieve-reuse.md).
+terkunci, dan penilaian test beserta pembanding. Hasil eksperimen tercatat di
+[laporan evaluasi Indo-Law](docs/evaluation/indo-law-evaluation.md).
+Rincian mesin dan benchmark ada di [panduan Retrieve–Reuse](docs/cbr/retrieve-reuse.md).
 
 ## Prasyarat
 
@@ -388,8 +388,10 @@ Perintah menjalankan tiga tahap pada database evaluasi sendiri di
 3. **test** menolak berjalan bila manifest, snapshot, atau konfigurasi terkunci
    tidak cocok. Setelah cocok, test menilai konfigurasi terkunci beserta dua
    varian: narasi saja dengan Reuse berbobot dan input gabungan dengan agregasi
-   aritmetika tanpa bobot. Hasil dan pembanding median ditulis ke
-   `test-report.json`.
+   aritmetika tanpa bobot. `test-report.json` memuat metrik CBR, median training
+   keseluruhan, dan median per kategori dengan cadangan median keseluruhan.
+   Kedua pembanding dinilai pada unit yang mendapat estimasi dan seluruh unit
+   test yang layak.
 
 Tahap dapat dipisah untuk pemeriksaan:
 
@@ -454,15 +456,16 @@ Hasil protokol pada snapshot resmi tercatat di
 Ringkasnya: dari 5.782 unit, split 4.048/867/867, konfigurasi
 `kandidat-15` dikunci dari validasi, lalu test 867 unit menunjukkan model
 gabungan berbobot mengestimasi 855 unit dengan MAE 371,7 hari (RMSE 660,8;
-MedAE 223,1). Pembanding median pada unit yang sama memberi MAE 393,9 hari
-(RMSE 746,8; MedAE 240,0). Varian narasi saja mencakup 863 unit dengan MAE 405,1
-hari, sedangkan varian gabungan tanpa bobot mencakup 855 unit dengan MAE 377,2
-hari.
+MedAE 223,1). Pada 855 unit yang sama, median per kategori memberi MAE
+393,9 hari dan median training keseluruhan memberi MAE 460,0 hari.
+Varian narasi saja mencakup 863 unit dengan MAE 405,1 hari, sedangkan varian
+gabungan tanpa bobot mencakup 855 unit dengan MAE 377,2 hari.
 
 Untuk mengulang dari workspace terpisah tanpa menyentuh hasil utama:
 
 ```bash
 mkdir -p data/evaluation-repro artifacts/evaluation-repro
+docker compose --profile tools build evaluate
 docker run --rm \
   -e DATABASE_PATH=/workspace/evaluation.db \
   -v "$PWD/data/raw:/sources:ro" \
@@ -517,8 +520,8 @@ bila ingin mengulang evaluasi dari nol.
   training memakai median keseluruhan.
 - `evaluatePredictions(predictions, baseline)` menghitung MAE, RMSE, MedAE,
   jumlah estimasi diterima/ditahan beserta alasannya, cakupan, dan pembanding
-  median pada unit yang persis sama maupun seluruh unit layak. Penyebut nol
-  menghasilkan status `unavailable`, bukan `0` atau `NaN`.
+  median keseluruhan dan per kategori pada unit yang memperoleh estimasi
+  maupun seluruh unit layak. Metrik dengan penyebut nol berstatus `unavailable`.
 - `buildEvaluationCandidates()` menghasilkan grid 32 kombinasi, sedangkan
   `selectValidationCandidate` menerapkan aturan pemilihan dan seri. Keduanya
   hanya menerima data validasi; target test tidak pernah dipakai untuk memilih.
