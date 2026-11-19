@@ -64,6 +64,7 @@ describe('evaluation pipeline', () => {
     expect(prepared.status).toBe('prepared');
     expect(prepared.exitCode).toBe(0);
     expect(prepared.counts).toMatchObject({ units: EXPECTED_UNIT_COUNT, groups: EXPECTED_UNIT_COUNT });
+    expect(Number(prepared.durationMs)).toBeGreaterThanOrEqual(0);
 
     const manifest = readJson<{
       checks: { everyUnitAssignedOnce: boolean; groupsDisjoint: boolean; emptySplits: string[] };

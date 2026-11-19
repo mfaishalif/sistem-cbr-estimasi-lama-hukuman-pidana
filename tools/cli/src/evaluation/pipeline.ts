@@ -597,7 +597,7 @@ function runImportSafely(options: EvaluationOptions, databasePath: string): Impo
 }
 
 export function prepareEvaluation(options: EvaluationOptions): EvaluationStageResult {
-  const startedAt = clock(options)();
+  const startedAt = performance.now();
   const workspace = options.workspace;
   const artifacts = options.artifacts;
   mkdirSync(workspace, { recursive: true });
