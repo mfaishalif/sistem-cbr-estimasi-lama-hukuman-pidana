@@ -140,8 +140,10 @@ kandidat itu 426,54 hari, lebih tinggi daripada 418,86 hari. Kunci dibuat pada
 
 ## Hasil test
 
-Test berisi 867 unit layak, 866 kelompok, dan 194 unit tanpa kategori. Baseline
-memakai median training keseluruhan dan median training per kategori.
+Test berisi 867 unit layak, 866 kelompok, dan 194 unit tanpa kategori. Evaluasi
+membandingkan CBR dengan dua model sederhana. Median training keseluruhan
+memberikan prediksi 660 hari untuk setiap unit. Median per kategori memakai
+660 hari sebagai cadangan ketika median kategori tidak tersedia.
 
 ### Ringkasan model
 
@@ -151,10 +153,19 @@ memakai median training keseluruhan dan median training per kategori.
 | Narasi berbobot | **99,54%** | 863/867 | 4 | 405,1 | 688,1 | 245,5 | 394,3 | 744,9 | 240,0 |
 | Gabungan tanpa bobot | 98,62% | 855/867 | 12 | 377,2 | 669,3 | 228,0 | 393,9 | 746,8 | 240,0 |
 
-Baseline pada seluruh 867 unit layak: MAE 394,2 hari, RMSE 743,7 hari, MedAE
-240,0 hari. Angka baseline pada tabel model dihitung pada unit yang sama dengan
-unit yang memperoleh estimasi dari model tersebut, sehingga perbandingan MAE
-langsung setara.
+Kolom baseline pada tabel model memakai median per kategori dan dihitung
+pada unit yang memperoleh estimasi dari masing-masing model. Pada seluruh
+867 unit layak, median per kategori memberikan MAE 394,2 hari, RMSE
+743,7 hari, dan MedAE 240,0 hari.
+
+### Pembanding median training keseluruhan
+
+| Unit test | n | MAE (hari) | RMSE (hari) | MedAE (hari) |
+| --- | ---: | ---: | ---: | ---: |
+| Seluruh unit layak | 867 | 458,2 | 899,0 | 240,0 |
+| Diestimasi model gabungan berbobot | 855 | 460,0 | 904,0 | 240,0 |
+| Diestimasi model narasi berbobot | 863 | 458,6 | 900,6 | 240,0 |
+| Diestimasi model gabungan tanpa bobot | 855 | 460,0 | 904,0 | 240,0 |
 
 ### Perbandingan pada irisan unit yang sama
 
@@ -165,7 +176,8 @@ Irisan unit yang memperoleh estimasi pada ketiga model berisi 854 unit.
 | Gabungan berbobot | 854 | 371,7 | 661,0 | 222,8 |
 | Narasi berbobot | 854 | 406,1 | 690,6 | 245,6 |
 | Gabungan tanpa bobot | 854 | 377,2 | 669,5 | 228,0 |
-| Baseline median | 854 | 394,1 | 747,2 | 240,0 |
+| Median per kategori | 854 | 394,1 | 747,2 | 240,0 |
+| Median training keseluruhan | 854 | 460,4 | 904,5 | 240,0 |
 
 ### Estimasi ditahan
 
@@ -276,8 +288,8 @@ estimasi.
 
 Batas pembacaan:
 
-- Ini satu pembagian kelompok dengan seed tetap, bukan estimasi variabilitas
-  antar-seed. Test hanya dinilai sekali setelah konfigurasi dikunci.
+- Ini satu pembagian kelompok dengan seed tetap. Konfigurasi dikunci sebelum
+  penilaian test dan dipakai kembali saat memeriksa reproduksibilitas.
 - Tidak ada label relevansi ahli; yang diukur adalah galat hasil akhir, bukan
   kualitas hukum kasus referensi.
 - Korpus adalah subset yang lolos impor (5.782 dari 22.630 XML). Hasil tidak
@@ -295,12 +307,18 @@ Workspace ini tidak memakai database atau artefak run pertama. Run ulang
 memilih `kandidat-15` yang sama dan menghasilkan seluruh fingerprint serta
 angka test yang identik.
 
+Setelah pelaporan median keseluruhan ditambahkan, tahap `test` dijalankan ulang
+dalam Docker pada dua salinan workspace, masing-masing dengan manifest, split,
+dan konfigurasi terkunci dari run asal. Metrik median keseluruhan cocok pada
+kedua salinan, dan SHA-256 detail prediksi test cocok dengan hash di bawah.
+
 Jalankan dari root repo (perintah `docker run` setara dengan overlay compose
 yang dipakai saat run ulang untuk memindahkan mount `/workspace` dan
 `/artifacts`):
 
 ```bash
 mkdir -p data/evaluation-repro artifacts/evaluation-repro
+docker compose --profile tools build evaluate
 docker run --rm \
   -e DATABASE_PATH=/workspace/evaluation.db \
   -v "$PWD/data/raw:/sources:ro" \

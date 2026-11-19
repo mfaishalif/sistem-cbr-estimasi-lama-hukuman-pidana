@@ -79,6 +79,21 @@ describe('evaluatePredictions', () => {
       expect(report.baselineOnEligibleUnits.rmseDays).toBeCloseTo(Math.sqrt(20000));
       expect(report.baselineOnEligibleUnits.medianAbsoluteErrorDays).toBe(145);
     }
+
+    expect(report.overallMedianOnAcceptedUnits).toEqual({
+      status: 'available',
+      unitCount: 3,
+      maeDays: 70,
+      rmseDays: Math.sqrt(7300),
+      medianAbsoluteErrorDays: 70,
+    });
+    expect(report.overallMedianOnEligibleUnits).toEqual({
+      status: 'available',
+      unitCount: 6,
+      maeDays: 790 / 6,
+      rmseDays: Math.sqrt(22750),
+      medianAbsoluteErrorDays: 145,
+    });
   });
 
   it('reports per-category blocks with their own set sizes', () => {
@@ -194,6 +209,8 @@ describe('evaluatePredictions', () => {
     expect(report.cbr).toMatchObject({ status: 'available', unitCount: 1, maeDays: 20 });
     expect(report.baselineOnAcceptedUnits.status).toBe('unavailable');
     expect(report.baselineOnEligibleUnits.status).toBe('unavailable');
+    expect(report.overallMedianOnAcceptedUnits.status).toBe('unavailable');
+    expect(report.overallMedianOnEligibleUnits.status).toBe('unavailable');
   });
 
   it('rejects duplicate units and invalid day values', () => {

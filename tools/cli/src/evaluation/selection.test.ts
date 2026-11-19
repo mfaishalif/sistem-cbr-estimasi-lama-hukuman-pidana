@@ -48,6 +48,8 @@ function report(input: {
       unitCount: 0,
       reason: 'test',
     },
+    overallMedianOnAcceptedUnits: { status: 'unavailable', unitCount: 0, reason: 'test' },
+    overallMedianOnEligibleUnits: { status: 'unavailable', unitCount: 0, reason: 'test' },
     withheldReasons: [],
     perCategory: [],
   };

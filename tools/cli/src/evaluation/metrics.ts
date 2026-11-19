@@ -74,10 +74,14 @@ export interface EvaluationBlock {
   coverage: Coverage;
   /** Errors of the CBR estimates on accepted units. */
   cbr: ErrorMetrics;
-  /** Baseline errors on exactly the accepted units, for a direct comparison. */
+  /** Category median errors on exactly the accepted units, with overall median fallback. */
   baselineOnAcceptedUnits: ErrorMetrics;
-  /** Baseline errors on every eligible unit, including withheld estimates. */
+  /** Category median errors on every eligible unit, with overall median fallback. */
   baselineOnEligibleUnits: ErrorMetrics;
+  /** Overall training median errors on exactly the accepted units. */
+  overallMedianOnAcceptedUnits: ErrorMetrics;
+  /** Overall training median errors on every eligible unit. */
+  overallMedianOnEligibleUnits: ErrorMetrics;
   /** Withheld estimates grouped by machine reason; null = no reason given. */
   withheldReasons: WithheldReasonCount[];
 }
@@ -136,11 +140,11 @@ function errorMetrics(errors: readonly number[], unavailableReason: string): Err
 
 function baselineErrors(
   units: readonly EligiblePrediction[],
-  baseline: MedianBaseline,
+  predict: (unit: EligiblePrediction) => number | null,
 ): number[] {
   const errors: number[] = [];
   for (const unit of units) {
-    const prediction = baselineDaysFor(baseline, unit.category);
+    const prediction = predict(unit);
     if (prediction !== null) {
       errors.push(Math.abs(unit.actualSentenceDays - prediction));
     }
@@ -163,6 +167,8 @@ function buildBlock(
     baseline.overallMedianDays === null
       ? 'Median training tidak tersedia, sehingga pembanding tidak dapat dihitung.'
       : 'Tidak ada unit yang memiliki hasil aktual dan pembanding.';
+  const predictCategoryMedian = (unit: EligiblePrediction) => baselineDaysFor(baseline, unit.category);
+  const predictOverallMedian = () => baseline.overallMedianDays;
 
   const reasonCounts = new Map<string | null, number>();
   for (const unit of withheld) {
@@ -198,11 +204,19 @@ function buildBlock(
       'Tidak ada estimasi pada unit layak, sehingga metrik tidak dapat dihitung.',
     ),
     baselineOnAcceptedUnits: errorMetrics(
-      baselineErrors(accepted, baseline),
+      baselineErrors(accepted, predictCategoryMedian),
       baselineUnavailableReason,
     ),
     baselineOnEligibleUnits: errorMetrics(
-      baselineErrors(eligibleUnits, baseline),
+      baselineErrors(eligibleUnits, predictCategoryMedian),
+      baselineUnavailableReason,
+    ),
+    overallMedianOnAcceptedUnits: errorMetrics(
+      baselineErrors(accepted, predictOverallMedian),
+      baselineUnavailableReason,
+    ),
+    overallMedianOnEligibleUnits: errorMetrics(
+      baselineErrors(eligibleUnits, predictOverallMedian),
       baselineUnavailableReason,
     ),
     withheldReasons,
