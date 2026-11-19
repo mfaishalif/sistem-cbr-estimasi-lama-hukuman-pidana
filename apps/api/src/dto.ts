@@ -5,6 +5,7 @@ import type {
 } from '@cbr/core';
 import {
   ValidationError,
+  normalizeFactValue,
   validateArticleDraft,
   validateFactValue,
 } from '@cbr/data';
@@ -92,7 +93,9 @@ function parseFactValue(value: unknown, key: string): FactValue {
         }),
   } as FactValue;
 
-  return validateFactValue(key, parsed);
+  // Validation happens after the shared attribute rule so that values which
+  // normalize away can be treated as unknown instead of rejected.
+  return parsed;
 }
 
 function parseAttributes(value: unknown): Record<string, FactValue> {
@@ -106,7 +109,13 @@ function parseAttributes(value: unknown): Record<string, FactValue> {
     if (trimmedKey === '') {
       throw new ValidationError('attributes tidak boleh memuat kunci kosong');
     }
-    parsed[trimmedKey] = parseFactValue(fact, trimmedKey);
+    const normalized = normalizeFactValue(trimmedKey, parseFactValue(fact, trimmedKey));
+    if (normalized === null) {
+      // A value that carries no information ("terdakwa", "-", unknown marker)
+      // is treated as unknown instead of being stored or compared.
+      continue;
+    }
+    parsed[trimmedKey] = validateFactValue(trimmedKey, normalized);
   }
   return parsed;
 }

@@ -1,14 +1,16 @@
 {
   "version": 1,
   "preprocessing": {
-    "minTokenLength": 2,
+    "minTokenLength": 1,
     "stopwords": [],
-    "sublinearTermFrequency": true,
+    "minDocumentFrequency": 2,
+    "sublinearTermFrequency": false,
     "smoothInverseDocumentFrequency": true
   },
   "components": {
-    "narrativeWeight": 1,
-    "articleWeight": 0.5,
+    "narrativeWeight": 0.75,
+    "articleWeight": 0.2,
+    "attributeGroupWeight": 0.05,
     "attributes": [
       {
         "attributeKey": "age_years",
@@ -67,9 +69,9 @@
   "categoryRestriction": "when-known",
   "retrieval": {
     "maxReferences": 5,
-    "minReferences": 1,
-    "minScore": 0,
-    "minAttributeCoverage": 0
+    "minReferences": 2,
+    "minScore": 0.1,
+    "minAttributeCoverage": 0.85
   },
   "rounding": "nearest-day-half-up"
 }

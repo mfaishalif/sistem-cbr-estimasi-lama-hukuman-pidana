@@ -26,6 +26,9 @@ const steps = [
   },
 ];
 
+/** Fingerprint of the locked `kandidat-15` configuration used by the evaluation. */
+const EVALUATION_FINGERPRINT = 'bd4fadb2b7402393';
+
 const evaluation = [
   { label: 'Perkara uji', value: '867' },
   { label: 'Cakupan estimasi', value: '98,62%', note: '855 dari 867 perkara mendapat estimasi' },
@@ -74,9 +77,17 @@ export function HowItWorks({ open, onOpenChange }: { open: boolean; onOpenChange
             {weights === undefined ? null : (
               <p className="tabular text-sm text-ink-subtle">
                 Bobot aplikasi: kronologi {formatNumber(weights.narrativeWeight)}, pasal dakwaan{' '}
-                {formatNumber(weights.articleWeight)}, tiap detail perkara{' '}
-                {formatNumber(Math.min(...weights.attributes.map((item) => item.weight)))}–
-                {formatNumber(Math.max(...weights.attributes.map((item) => item.weight)))}.
+                {formatNumber(weights.articleWeight)},{' '}
+                {weights.attributeGroupWeight === undefined ? (
+                  <>
+                    tiap detail perkara{' '}
+                    {formatNumber(Math.min(...weights.attributes.map((item) => item.weight)))}–
+                    {formatNumber(Math.max(...weights.attributes.map((item) => item.weight)))}
+                  </>
+                ) : (
+                  <>kelompok atribut {formatNumber(weights.attributeGroupWeight)}</>
+                )}
+                .
               </p>
             )}
           </div>
@@ -92,6 +103,10 @@ export function HowItWorks({ open, onOpenChange }: { open: boolean; onOpenChange
             Basis kasus Indo-Law (5.782 perkara) dibagi 70% latih, 15% validasi, dan 15% uji per kelompok perkara.
             Bobot dan ambang dipilih pada data validasi, lalu diukur sekali pada data uji.
           </p>
+          <p className="rounded-md border border-rule px-4 py-3 text-[13px] text-ink-subtle">
+            Cakupan dan MAE di bawah adalah hasil uji historis sebelum nilai pendidikan dan pekerjaan
+            dinormalisasi. Angka itu bukan hasil ulang pada basis kasus yang sedang dipakai.
+          </p>
           <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
             {evaluation.map((item) => (
               <div key={item.label}>
@@ -101,11 +116,19 @@ export function HowItWorks({ open, onOpenChange }: { open: boolean; onOpenChange
               </div>
             ))}
           </dl>
-          <p className="text-[13px] text-ink-subtle">
-            Angka evaluasi berasal dari konfigurasi evaluasi yang dikunci. Aplikasi memakai konfigurasi di{' '}
-            <span className="tabular">{config?.displayPath ?? 'config/retrieval.json'}</span>
-            {config === null ? '' : ` (sidik ${config.fingerprint})`}, sehingga hasil di aplikasi dapat berbeda.
-          </p>
+          {config !== null && config.fingerprint === EVALUATION_FINGERPRINT ? (
+            <p className="text-[13px] text-ink-subtle">
+              Aplikasi memakai konfigurasi yang sama dengan evaluasi:{' '}
+              <span className="tabular">{config.displayPath}</span> (sidik{' '}
+              <span className="tabular">{config.fingerprint}</span>).
+            </p>
+          ) : (
+            <p className="text-[13px] text-ink-subtle">
+              Angka evaluasi berasal dari konfigurasi evaluasi yang dikunci. Aplikasi memakai konfigurasi di{' '}
+              <span className="tabular">{config?.displayPath ?? 'config/retrieval.json'}</span>
+              {config === null ? '' : ` (sidik ${config.fingerprint})`}, sehingga hasil di aplikasi dapat berbeda.
+            </p>
+          )}
         </section>
       </div>
     </Sheet>

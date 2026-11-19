@@ -16,7 +16,12 @@ export function ActFields({ idPrefix, form, patch, errors, disabled }: FieldsPro
     <fieldset>
       <legend className={SECTION_HEADING}>Perbuatan dan akibat</legend>
       <div className={`${SECTION_BODY} ${FORM_GRID}`}>
-        <Field id={`${idPrefix}-role`} label="Peran terdakwa" className={span.role}>
+        <Field
+          id={`${idPrefix}-role`}
+          label="Peran terdakwa"
+          hint="Jarang tercatat di putusan Indo-Law, jadi isian ini hampir tidak memengaruhi kemiripan."
+          className={span.role}
+        >
           <Select id={`${idPrefix}-role`} value={form.role} onChange={(event) => patch({ role: event.target.value })} disabled={disabled}>
             <option value="">Belum diketahui</option>
             {ROLES.map((option) => (
@@ -49,14 +54,20 @@ export function ActFields({ idPrefix, form, patch, errors, disabled }: FieldsPro
           />
         </Field>
 
-        <Field id={`${idPrefix}-victim-count`} label="Jumlah korban" error={victimError} className={span.count}>
+        <Field
+          id={`${idPrefix}-victim-count`}
+          label="Jumlah korban"
+          hint="Hampir tidak pernah tercatat di putusan Indo-Law; pengaruhnya pada kemiripan sangat kecil."
+          error={victimError}
+          className={span.count}
+        >
           <Input
             id={`${idPrefix}-victim-count`}
             inputMode="numeric"
             value={form.victimCount}
             onChange={(event) => patch({ victimCount: event.target.value })}
             aria-invalid={victimError === undefined ? undefined : true}
-            aria-describedby={describedBy(`${idPrefix}-victim-count`, { error: victimError })}
+            aria-describedby={describedBy(`${idPrefix}-victim-count`, { hint: true, error: victimError })}
             className="tabular"
             autoComplete="off"
             disabled={disabled}

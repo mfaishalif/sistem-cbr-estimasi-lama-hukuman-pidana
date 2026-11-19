@@ -1,15 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
-import type {
-  AppConfigEntry,
-  CaseArticle,
-  CaseArticleDraft,
-  CaseBaseGeneration,
-  CaseUnit,
-  CaseUnitDraft,
-  DatabaseStatus,
-  FactValue,
-  NormalizedCaseIdentity,
+import {
+  normalizeAttributeValue,
+  type AppConfigEntry,
+  type CaseArticle,
+  type CaseArticleDraft,
+  type CaseBaseGeneration,
+  type CaseUnit,
+  type CaseUnitDraft,
+  type DatabaseStatus,
+  type FactValue,
+  type NormalizedCaseIdentity,
 } from '@cbr/core';
 import { getSchemaVersion } from './migrations';
 
@@ -66,6 +67,7 @@ export interface CaseUnitSummary {
   caseNumber: string;
   defendantName: string | null;
   category: string | null;
+  narrationPreview: string | null;
   actualSentenceDays: number | null;
   articleCount: number;
   sourceCount: number;
@@ -241,6 +243,37 @@ export function validateFactValue(key: string, value: FactValue): FactValue {
   }
 }
 
+/**
+ * Apply the shared attribute-value rule before a value is stored. Values that
+ * carry no information ("terdakwa", "-", empty, unknown markers) are dropped
+ * by returning null; meaningful free text is kept in canonical form. Evidence
+ * source locations are preserved.
+ */
+export function normalizeFactValue(key: string, value: FactValue): FactValue | null {
+  if ((key !== 'education' && key !== 'occupation') ||
+      (value.type !== 'text' && value.type !== 'enum') ||
+      typeof value.value !== 'string') {
+    return value;
+  }
+  const normalized = normalizeAttributeValue(key, value.value);
+  return normalized === null ? null : { ...value, value: normalized };
+}
+
+function normalizedAttributeEntries(
+  attributes: Record<string, FactValue> | undefined,
+): Array<{ key: string; value: FactValue }> {
+  const entries: Array<{ key: string; value: FactValue }> = [];
+  for (const [rawKey, rawValue] of Object.entries(attributes ?? {})) {
+    const key = requireText(rawKey, 'attribute key');
+    const normalized = normalizeFactValue(key, rawValue);
+    if (normalized === null) {
+      continue;
+    }
+    entries.push({ key, value: validateFactValue(key, normalized) });
+  }
+  return entries;
+}
+
 function insertFactAttribute(
   db: DatabaseSync,
   caseUnitId: string,
@@ -289,7 +322,7 @@ export function createCaseUnit(
   const caseNumber = requireText(draft.caseNumber, 'caseNumber');
   const narration = requireText(draft.narration, 'narration');
   const defendantName = draft.defendantName?.trim() || null;
-  const category = draft.category?.trim() || null;
+  const category = normalizeStoredCategory(draft.category);
   const categorySourceLocation = draft.categorySourceLocation?.trim() || null;
   const actualSentenceDays = draft.actualSentenceDays ?? null;
   const identity = normalizeCaseIdentity(court, caseNumber);
@@ -304,10 +337,7 @@ export function createCaseUnit(
   }
 
   const articles = (draft.articles ?? []).map(validateArticleDraft);
-  const attributes = Object.entries(draft.attributes ?? {}).map(([key, value]) => ({
-    key: requireText(key, 'attribute key'),
-    value: validateFactValue(key, value),
-  }));
+  const attributes = normalizedAttributeEntries(draft.attributes);
 
   const unitId = idFactory();
   let caseGroupId = draft.caseGroupId?.trim() || null;
@@ -403,7 +433,7 @@ export function updateCaseUnit(
   const caseNumber = requireText(draft.caseNumber, 'caseNumber');
   const narration = requireText(draft.narration, 'narration');
   const defendantName = draft.defendantName?.trim() || null;
-  const category = draft.category?.trim() || null;
+  const category = normalizeStoredCategory(draft.category);
   const categorySourceLocation = draft.categorySourceLocation?.trim() || null;
   const identity = normalizeCaseIdentity(court, caseNumber);
   const actualSentenceDays =
@@ -421,10 +451,7 @@ export function updateCaseUnit(
   }
 
   const articles = (draft.articles ?? []).map(validateArticleDraft);
-  const attributes = Object.entries(draft.attributes ?? {}).map(([key, value]) => ({
-    key: requireText(key, 'attribute key'),
-    value: validateFactValue(key, value),
-  }));
+  const attributes = normalizedAttributeEntries(draft.attributes);
 
   const requestedGroupId = draft.caseGroupId?.trim() || null;
   let caseGroupId = current.caseGroupId;
@@ -839,11 +866,89 @@ export function listCaseUnits(db: DatabaseSync, limit = 50): CaseUnit[] {
     .filter((unit): unit is CaseUnit => unit !== null);
 }
 
+/** Special category filter value meaning "category IS NULL". */
+function normalizeStoredCategory(value: string | null | undefined): string | null {
+  const category = value?.trim() || null;
+  if (category === NONE_CATEGORY) {
+    throw new ValidationError('Kategori __none__ dicadangkan untuk filter tanpa kategori');
+  }
+  return category;
+}
+
+export const NONE_CATEGORY = '__none__';
+
 export interface CaseUnitListOptions {
   limit?: number;
   offset?: number;
   /** Case-insensitive substring over court, case number, defendant, and category. */
   query?: string;
+  /** Exact category slug, or NONE_CATEGORY for units without a category. */
+  category?: string;
+}
+
+interface CaseFilter {
+  where: string;
+  parameters: string[];
+}
+
+/** One predicate shared by listing and counting so `total` cannot drift. */
+function buildCaseFilter(options: Pick<CaseUnitListOptions, 'query' | 'category'>): CaseFilter {
+  const clauses: string[] = [];
+  const parameters: string[] = [];
+  const query = options.query?.trim().toLowerCase() ?? '';
+
+  if (query !== '') {
+    const pattern = `%${query}%`;
+    clauses.push(`(lower(cu.court) LIKE ?
+              OR lower(cu.case_number) LIKE ?
+              OR lower(COALESCE(cu.defendant_name, '')) LIKE ?
+              OR lower(COALESCE(cu.category, '')) LIKE ?)`);
+    parameters.push(pattern, pattern, pattern, pattern);
+  }
+
+  const category = options.category;
+  if (category !== undefined && category !== '') {
+    if (category === NONE_CATEGORY) {
+      clauses.push('cu.category IS NULL');
+    } else {
+      clauses.push('cu.category = ?');
+      parameters.push(category);
+    }
+  }
+
+  return {
+    where: clauses.length === 0 ? '' : `WHERE ${clauses.join(' AND ')}`,
+    parameters,
+  };
+}
+
+/**
+ * Collapse whitespace and cut at a word boundary. The returned string is at
+ * most `maxLength` characters including the ellipsis.
+ */
+export function buildNarrationPreview(
+  narration: string | null | undefined,
+  maxLength = 160,
+): string | null {
+  if (narration === null || narration === undefined) {
+    return null;
+  }
+  const collapsed = narration.replace(/\s+/g, ' ').trim();
+  if (collapsed === '') {
+    return null;
+  }
+  if (collapsed.length <= maxLength) {
+    return collapsed;
+  }
+
+  const budget = Math.max(1, maxLength - 1);
+  let slice = collapsed.slice(0, budget);
+  const lastSpace = slice.lastIndexOf(' ');
+  if (lastSpace > 0) {
+    slice = slice.slice(0, lastSpace);
+  }
+  slice = slice.replace(/[\s,;:.!?–—-]+$/u, '').trim();
+  return `${slice}…`;
 }
 
 /** Paginated summaries for the case-base list. Facts stay in `getCaseUnit`. */
@@ -853,17 +958,7 @@ export function listCaseUnitSummaries(
 ): CaseUnitSummary[] {
   const limit = Math.min(Math.max(Math.trunc(options.limit ?? 25), 1), 200);
   const offset = Math.max(Math.trunc(options.offset ?? 0), 0);
-  const query = options.query?.trim().toLowerCase() ?? '';
-
-  const where =
-    query === ''
-      ? ''
-      : `WHERE lower(cu.court) LIKE ?
-            OR lower(cu.case_number) LIKE ?
-            OR lower(COALESCE(cu.defendant_name, '')) LIKE ?
-            OR lower(COALESCE(cu.category, '')) LIKE ?`;
-  const pattern = `%${query}%`;
-  const parameters: string[] = query === '' ? [] : [pattern, pattern, pattern, pattern];
+  const filter = buildCaseFilter(options);
 
   const rows = db
     .prepare(
@@ -874,6 +969,7 @@ export function listCaseUnitSummaries(
               cu.case_number,
               cu.defendant_name,
               cu.category,
+              cu.narration,
               cu.actual_sentence_days,
               cu.created_at,
               cu.updated_at,
@@ -883,11 +979,11 @@ export function listCaseUnitSummaries(
                 AS source_count
          FROM case_unit cu
          LEFT JOIN case_group cg ON cg.id = cu.case_group_id
-         ${where}
+         ${filter.where}
         ORDER BY cu.created_at DESC, cu.id
         LIMIT ? OFFSET ?`,
     )
-    .all(...parameters, limit, offset) as unknown as Array<{
+    .all(...filter.parameters, limit, offset) as unknown as Array<{
     id: string;
     case_group_id: string;
     case_group_label: string | null;
@@ -895,6 +991,7 @@ export function listCaseUnitSummaries(
     case_number: string;
     defendant_name: string | null;
     category: string | null;
+    narration: string;
     actual_sentence_days: number | null;
     article_count: number;
     source_count: number;
@@ -910,12 +1007,111 @@ export function listCaseUnitSummaries(
     caseNumber: row.case_number,
     defendantName: row.defendant_name,
     category: row.category,
+    narrationPreview: buildNarrationPreview(row.narration),
     actualSentenceDays: row.actual_sentence_days,
     articleCount: row.article_count,
     sourceCount: row.source_count,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }));
+}
+
+/** Count the same predicate as `listCaseUnitSummaries`. */
+export function countCaseUnitSummaries(
+  db: DatabaseSync,
+  options: Pick<CaseUnitListOptions, 'query' | 'category'> = {},
+): number {
+  const filter = buildCaseFilter(options);
+  const row = db
+    .prepare(`SELECT COUNT(*) AS count FROM case_unit cu ${filter.where}`)
+    .get(...filter.parameters) as { count: number };
+  return row.count;
+}
+
+export interface VocabularyCount {
+  value: string;
+  caseCount: number;
+}
+
+export interface CaseBaseVocabulary {
+  generation: number;
+  categories: VocabularyCount[];
+  uncategorizedCount: number;
+  attributes: {
+    education: VocabularyCount[];
+    occupation: VocabularyCount[];
+  };
+  limit: number;
+}
+
+/**
+ * Read the whole vocabulary inside one transaction so counts and generation
+ * describe the same case-base snapshot.
+ */
+export function getCaseBaseVocabulary(
+  db: DatabaseSync,
+  limit = 20,
+): CaseBaseVocabulary {
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 20);
+
+  db.exec('SAVEPOINT vocabulary_read');
+  try {
+    const generation = getCaseBaseGeneration(db).generation;
+
+    const categories = db
+      .prepare(
+        `SELECT category AS value, COUNT(*) AS case_count
+           FROM case_unit
+          WHERE category IS NOT NULL
+          GROUP BY category
+          ORDER BY case_count DESC, value ASC`,
+      )
+      .all() as unknown as Array<{ value: string; case_count: number }>;
+
+    const uncategorized = db
+      .prepare(
+        `SELECT COUNT(*) AS count FROM case_unit WHERE category IS NULL`,
+      )
+      .get() as { count: number };
+
+    const attributeCounts = (attributeKey: string): VocabularyCount[] => {
+      const rows = db
+        .prepare(
+          `SELECT lower(value_text) AS value, COUNT(*) AS case_count
+             FROM case_fact_attribute
+            WHERE attribute_key = ? AND value_text IS NOT NULL
+            GROUP BY lower(value_text)
+            ORDER BY case_count DESC, value ASC
+            LIMIT ?`,
+        )
+        .all(attributeKey, safeLimit) as unknown as Array<{
+        value: string;
+        case_count: number;
+      }>;
+      return rows.map((row) => ({ value: row.value, caseCount: row.case_count }));
+    };
+
+    const vocabulary: CaseBaseVocabulary = {
+      generation,
+      categories: categories.map((row) => ({
+        value: row.value,
+        caseCount: row.case_count,
+      })),
+      uncategorizedCount: uncategorized.count,
+      attributes: {
+        education: attributeCounts('education'),
+        occupation: attributeCounts('occupation'),
+      },
+      limit: safeLimit,
+    };
+
+    db.exec('RELEASE vocabulary_read');
+    return vocabulary;
+  } catch (error) {
+    db.exec('ROLLBACK TO vocabulary_read');
+    db.exec('RELEASE vocabulary_read');
+    throw error;
+  }
 }
 
 /** Provenance of one case unit, including every known source alias. */

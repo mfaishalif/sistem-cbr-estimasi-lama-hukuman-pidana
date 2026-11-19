@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { CaseUnitDraft } from '@cbr/core';
 import {
+  countCaseUnitSummaries,
   createCaseUnit,
   deleteCaseUnit,
   getCaseBaseGeneration,
@@ -17,6 +18,7 @@ export interface CaseListQuery {
   limit?: number;
   offset?: number;
   query?: string;
+  category?: string;
 }
 
 @Injectable()
@@ -29,12 +31,17 @@ export class CasesService {
   list(query: CaseListQuery) {
     const limit = Math.min(Math.max(Math.trunc(query.limit ?? 25), 1), 200);
     const offset = Math.max(Math.trunc(query.offset ?? 0), 0);
+    const category = query.category?.trim() || undefined;
     const items = listCaseUnitSummaries(this.database.database, {
       limit,
       offset,
       query: query.query,
+      category,
     });
-    const total = this.count(query.query);
+    const total = countCaseUnitSummaries(this.database.database, {
+      query: query.query,
+      category,
+    });
     return {
       items,
       total,
@@ -86,25 +93,4 @@ export class CasesService {
     };
   }
 
-  private count(query?: string): number {
-    const normalized = query?.trim();
-    if (!normalized) {
-      const row = this.database.database
-        .prepare('SELECT COUNT(*) AS count FROM case_unit')
-        .get() as { count: number };
-      return row.count;
-    }
-    const pattern = `%${normalized.toLowerCase()}%`;
-    const row = this.database.database
-      .prepare(
-        `SELECT COUNT(*) AS count
-           FROM case_unit
-          WHERE lower(court) LIKE ?
-             OR lower(case_number) LIKE ?
-             OR lower(COALESCE(defendant_name, '')) LIKE ?
-             OR lower(COALESCE(category, '')) LIKE ?`,
-      )
-      .get(pattern, pattern, pattern, pattern) as { count: number };
-    return row.count;
-  }
 }

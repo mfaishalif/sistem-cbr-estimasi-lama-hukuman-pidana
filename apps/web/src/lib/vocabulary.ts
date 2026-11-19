@@ -1,16 +1,20 @@
 /**
  * Display vocabulary for slugs stored in the case base.
  *
- * TEMPORARY: categories are hardcoded until the backend exposes
- * `GET /api/vocabulary` (see docs/frontend/backend-requests.md). The slugs are
- * sent to the API exactly as they appear in Indo-Law, including the typos
- * `keteriban` and `kematianluka`; only the labels are tidied.
+ * The selectable category list and education/occupation suggestions now come
+ * from `GET /api/vocabulary`; the labels below only tidy the slugs that
+ * Indo-Law stores, including the typos `keteriban` and `kematianluka`.
  */
 
 export interface Option<T extends string = string> {
   value: T;
   label: string;
 }
+
+/** API value that selects cases whose category is NULL. */
+export const NONE_CATEGORY = '__none__';
+
+export const UNCATEGORIZED_LABEL = 'Tanpa kategori';
 
 export const CATEGORIES: Option[] = [
   { value: 'pencurian', label: 'Pencurian' },
@@ -40,6 +44,39 @@ export const CATEGORIES: Option[] = [
     label: 'Kejahatan terhadap kemerdekaan orang lain',
   },
 ];
+
+/** Canonical education values written by the import and API normalization. */
+export const EDUCATION_LEVELS: Option[] = [
+  { value: 'tidak-sekolah', label: 'Tidak sekolah' },
+  { value: 'sd', label: 'SD' },
+  { value: 'smp', label: 'SMP' },
+  { value: 'sma', label: 'SMA' },
+  { value: 'diploma', label: 'Diploma' },
+  { value: 'sarjana', label: 'Sarjana' },
+  { value: 'pascasarjana', label: 'Pascasarjana' },
+];
+
+/** Keep a stored value visible even when it is outside the canonical list. */
+export function educationOptions(current: string): Option[] {
+  if (current === '' || EDUCATION_LEVELS.some((option) => option.value === current)) {
+    return EDUCATION_LEVELS;
+  }
+  return [...EDUCATION_LEVELS, { value: current, label: humanizeSlug(current) }];
+}
+
+export interface CategoryOption extends Option {
+  caseCount: number;
+}
+
+export function categoryOptionsFromVocabulary(
+  categories: readonly { value: string; caseCount: number }[],
+): CategoryOption[] {
+  return categories.map((category) => ({
+    value: category.value,
+    label: categoryLabel(category.value) ?? humanizeSlug(category.value),
+    caseCount: category.caseCount,
+  }));
+}
 
 export const GENDERS: Option[] = [
   { value: 'laki-laki', label: 'Laki-laki' },
@@ -114,6 +151,11 @@ export function categoryLabel(slug: string | null | undefined): string | null {
 }
 
 /** Lower-case form for running text: "kategori pencurian". */
+/** Category label with an explicit fallback for an uncategorized case. */
+export function categoryDisplay(slug: string | null | undefined): string {
+  return categoryLabel(slug) ?? UNCATEGORIZED_LABEL;
+}
+
 export function categoryPhrase(slug: string | null | undefined): string | null {
   const label = categoryLabel(slug);
   return label === null ? null : label.charAt(0).toLowerCase() + label.slice(1);

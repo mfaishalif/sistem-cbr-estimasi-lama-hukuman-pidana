@@ -56,6 +56,7 @@ export interface CaseUnitSummary {
   caseNumber: string;
   defendantName: string | null;
   category: string | null;
+  narrationPreview: string | null;
   actualSentenceDays: number | null;
   articleCount: number;
   sourceCount: number;
@@ -69,6 +70,22 @@ export interface CaseListResponse {
   limit: number;
   offset: number;
   generation: number;
+}
+
+export interface VocabularyCount {
+  value: string;
+  caseCount: number;
+}
+
+export interface VocabularyResponse {
+  generation: number;
+  categories: VocabularyCount[];
+  uncategorizedCount: number;
+  attributes: {
+    education: VocabularyCount[];
+    occupation: VocabularyCount[];
+  };
+  limit: number;
 }
 
 export interface CaseDraft {
@@ -219,6 +236,7 @@ export interface RetrievalConfig {
   components: {
     narrativeWeight: number;
     articleWeight: number;
+    attributeGroupWeight?: number;
     attributes: Array<{
       attributeKey: string;
       weight: number;
@@ -310,11 +328,14 @@ export const api = {
       body: JSON.stringify({ facts, excludeCaseUnitIds }),
     }),
 
-  listCases: (options: { limit?: number; offset?: number; q?: string } = {}) => {
+  vocabulary: () => request<VocabularyResponse>('/api/vocabulary'),
+
+  listCases: (options: { limit?: number; offset?: number; q?: string; category?: string } = {}) => {
     const params = new URLSearchParams();
     if (options.limit !== undefined) params.set('limit', String(options.limit));
     if (options.offset !== undefined) params.set('offset', String(options.offset));
     if (options.q?.trim()) params.set('q', options.q.trim());
+    if (options.category?.trim()) params.set('category', options.category.trim());
     const query = params.toString();
     const suffix = query === '' ? '' : `?${query}`;
     return request<CaseListResponse>(`/api/cases${suffix}`);

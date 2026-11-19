@@ -3,6 +3,7 @@ export * from './config';
 export * from './contracts';
 export * from './text';
 export * from './attributes';
+export * from './attribute-values';
 export * from './tfidf';
 export * from './retrieval-index';
 export * from './retrieve';

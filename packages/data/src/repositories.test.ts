@@ -5,11 +5,14 @@ import type { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runMigrations } from './migrations';
 import {
+  buildNarrationPreview,
   countCaseGroups,
+  countCaseUnitSummaries,
   countCaseUnits,
   createCaseUnit,
   deleteCaseUnit,
   getCaseBaseGeneration,
+  getCaseBaseVocabulary,
   getCaseUnit,
   getConfig,
   insertSourceAlias,
@@ -18,6 +21,8 @@ import {
   listCaseUnitSources,
   listCaseUnits,
   listCaseUnitSummaries,
+  NONE_CATEGORY,
+  normalizeFactValue,
   setConfig,
   updateCaseUnit,
   ValidationError,
@@ -405,5 +410,181 @@ describe('case base generation and configuration', () => {
     expect(getConfig<{ lowercase: boolean }>(db, 'preprocessing')?.value.lowercase).toBe(true);
     expect(getConfig(db, 'missing')).toBeNull();
     expect(getCaseBaseGeneration(db).generation).toBeGreaterThan(before);
+  });
+});
+
+describe('attribute normalization at write time', () => {
+  it('stores canonical education and occupation values', () => {
+    const unitId = createCaseUnit(db, {
+      ...draft,
+      attributes: {
+        education: { type: 'text', value: '  SLTA  ', sourceLocation: 'identitas@pendidikan' },
+        occupation: { type: 'text', value: 'Karyawan   Swasta', sourceLocation: 'identitas@pekerjaan' },
+      },
+    });
+
+    const attributes = getCaseUnit(db, unitId)?.facts.attributes;
+    expect(attributes?.education).toEqual({
+      type: 'text',
+      value: 'sma',
+      sourceLocation: 'identitas@pendidikan',
+    });
+    expect(attributes?.occupation).toEqual({
+      type: 'text',
+      value: 'swasta',
+      sourceLocation: 'identitas@pekerjaan',
+    });
+  });
+
+  it('drops values that are not real answers instead of storing noise', () => {
+    const unitId = createCaseUnit(db, {
+      ...draft,
+      attributes: {
+        education: { type: 'text', value: 'terdakwa' },
+        occupation: { type: 'text', value: '-' },
+        gender: { type: 'enum', value: 'Laki-Laki' },
+      },
+    });
+
+    const attributes = getCaseUnit(db, unitId)?.facts.attributes ?? {};
+    expect(attributes).not.toHaveProperty('education');
+    expect(attributes).not.toHaveProperty('occupation');
+    expect(attributes.gender).toEqual({ type: 'enum', value: 'Laki-Laki' });
+  });
+
+  it('preserves set values outside education and occupation', () => {
+    expect(
+      normalizeFactValue('weapon_or_mode', {
+        type: 'set',
+        value: JSON.stringify(['Senjata  Tajam', 'senjata-tajam', '']),
+      }),
+    ).toEqual({
+      type: 'set',
+      value: JSON.stringify(['Senjata  Tajam', 'senjata-tajam', '']),
+    });
+    expect(normalizeFactValue('education', { type: 'text', value: 'terdakwa' })).toBeNull();
+  });
+});
+
+describe('case list filters, previews, and vocabulary', () => {
+  it('reserves the uncategorized filter value on create and update', () => {
+    const reserved = { ...draft, category: ' __none__ ' };
+    expect(() => createCaseUnit(db, reserved)).toThrow('dicadangkan');
+    const id = createCaseUnit(db, draft);
+    expect(() => updateCaseUnit(db, id, reserved)).toThrow('dicadangkan');
+  });
+
+  it('combines an exact category filter with search and keeps total consistent', () => {
+    createCaseUnit(db, {
+      ...draft,
+      court: 'PN Tegal',
+      narration: 'Terdakwa mengambil sepeda motor di Tegal.',
+      category: 'pencurian',
+    });
+    createCaseUnit(db, {
+      ...draft,
+      court: 'PN Semarang',
+      caseNumber: '2/Pid.B/2024/PN Smg',
+      defendantName: 'Terdakwa B',
+      narration: 'Terdakwa mengambil sepeda motor di Semarang.',
+      category: 'pencurian',
+    });
+    createCaseUnit(db, {
+      ...draft,
+      court: 'PN Tegal',
+      caseNumber: '3/Pid.B/2024/PN Tgl',
+      defendantName: 'Terdakwa C',
+      narration: 'Terdakwa melakukan penipuan di Tegal.',
+      category: 'penipuan',
+    });
+    createCaseUnit(db, {
+      ...draft,
+      court: 'PN Tegal',
+      caseNumber: '4/Pid.B/2024/PN Tgl',
+      defendantName: 'Terdakwa D',
+      narration: 'Perkara tanpa kategori di Tegal.',
+      category: null,
+    });
+
+    const options = { query: 'tegal', category: 'pencurian' };
+    const items = listCaseUnitSummaries(db, options);
+    expect(items).toHaveLength(1);
+    expect(items[0]?.court).toBe('PN Tegal');
+    expect(countCaseUnitSummaries(db, options)).toBe(1);
+
+    const uncategorized = { category: NONE_CATEGORY };
+    expect(listCaseUnitSummaries(db, uncategorized)).toHaveLength(1);
+    expect(countCaseUnitSummaries(db, uncategorized)).toBe(1);
+    expect(listCaseUnitSummaries(db, { category: 'penipuan' })).toHaveLength(1);
+    expect(listCaseUnitSummaries(db, { category: '' })).toHaveLength(4);
+    expect(countCaseUnitSummaries(db, { category: '' })).toBe(4);
+  });
+
+  it('builds a collapsed preview capped at 160 characters including the ellipsis', () => {
+    const narration = `  Terdakwa   mengambil ${'sepeda motor milik korban '.repeat(12)}  `;
+    createCaseUnit(db, { ...draft, narration });
+
+    const preview = listCaseUnitSummaries(db, {})[0]?.narrationPreview;
+    expect(preview).not.toBeNull();
+    expect(preview?.length).toBeLessThanOrEqual(160);
+    expect(preview?.endsWith('…')).toBe(true);
+    expect(preview).not.toContain('  ');
+    expect(preview).not.toContain('\n');
+    expect(buildNarrationPreview('   ')).toBeNull();
+    expect(buildNarrationPreview(null)).toBeNull();
+    expect(buildNarrationPreview('Pendek saja.')).toBe('Pendek saja.');
+  });
+
+  it('returns an empty vocabulary for an empty case base', () => {
+    const vocabulary = getCaseBaseVocabulary(db);
+
+    expect(vocabulary.generation).toBe(getCaseBaseGeneration(db).generation);
+    expect(vocabulary.categories).toEqual([]);
+    expect(vocabulary.uncategorizedCount).toBe(0);
+    expect(vocabulary.attributes).toEqual({ education: [], occupation: [] });
+    expect(vocabulary.limit).toBe(20);
+  });
+
+  it('sorts category and attribute counts by count desc then value asc', () => {
+    createCaseUnit(db, { ...draft, category: 'penipuan', attributes: { education: { type: 'text', value: 'sd' } } });
+    createCaseUnit(db, { ...draft, category: 'pencurian', attributes: { education: { type: 'text', value: 'sma' } } });
+    createCaseUnit(db, { ...draft, category: 'penggelapan', attributes: { education: { type: 'text', value: 'sd' } } });
+    createCaseUnit(db, { ...draft, category: 'penipuan', attributes: { education: { type: 'text', value: 'sma' } } });
+
+    const vocabulary = getCaseBaseVocabulary(db);
+
+    expect(vocabulary.categories).toEqual([
+      { value: 'penipuan', caseCount: 2 },
+      { value: 'pencurian', caseCount: 1 },
+      { value: 'penggelapan', caseCount: 1 },
+    ]);
+    expect(vocabulary.uncategorizedCount).toBe(0);
+    expect(vocabulary.attributes.education).toEqual([
+      { value: 'sd', caseCount: 2 },
+      { value: 'sma', caseCount: 2 },
+    ]);
+  });
+
+  it('caps education and occupation suggestions at 20 values', () => {
+    for (let index = 0; index < 25; index += 1) {
+      createCaseUnit(db, {
+        ...draft,
+        caseNumber: `${index}/Pid.B/2024/PN Jkt.Pst`,
+        defendantName: `Terdakwa ${index}`,
+        category: null,
+        attributes: {
+          education: { type: 'text', value: `pendidikan-${String(index).padStart(2, '0')}` },
+          occupation: { type: 'text', value: `pekerjaan-${String(index).padStart(2, '0')}` },
+        },
+      });
+    }
+
+    const vocabulary = getCaseBaseVocabulary(db, 50);
+    expect(vocabulary.limit).toBe(20);
+    expect(vocabulary.attributes.education).toHaveLength(20);
+    expect(vocabulary.attributes.occupation).toHaveLength(20);
+    expect(vocabulary.attributes.education[0]?.value).toBe('pendidikan-00');
+    expect(vocabulary.attributes.education[19]?.value).toBe('pendidikan-19');
+    expect(vocabulary.uncategorizedCount).toBe(25);
   });
 });
