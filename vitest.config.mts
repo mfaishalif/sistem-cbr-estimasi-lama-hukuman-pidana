@@ -6,10 +6,16 @@ export default defineConfig({
     alias: {
       '@cbr/core': fileURLToPath(new URL('./packages/cbr/src/index.ts', import.meta.url)),
       '@cbr/data': fileURLToPath(new URL('./packages/data/src/index.ts', import.meta.url)),
+      '@': fileURLToPath(new URL('./apps/web/src', import.meta.url)),
     },
   },
   test: {
-    include: ['packages/**/*.test.ts', 'tools/**/*.test.ts', 'apps/api/src/**/*.test.ts'],
+    include: [
+      'packages/**/*.test.ts',
+      'tools/**/*.test.ts',
+      'apps/api/src/**/*.test.ts',
+      'apps/web/src/**/*.test.ts',
+    ],
     environment: 'node',
     pool: 'forks',
   },

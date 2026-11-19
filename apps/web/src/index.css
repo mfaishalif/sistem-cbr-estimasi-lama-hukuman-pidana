@@ -1,131 +1,120 @@
 @import "tailwindcss";
 
 /*
- * Linear-inspired tokens from design.md.
- * The single chromatic accent is lavender-blue; hierarchy comes from the
- * surface ladder and hairline borders rather than shadows.
+ * Tokens from design.md. Paper background, white result panel, near-black
+ * ink, one maroon accent. Hierarchy comes from spacing and type size; borders
+ * are reserved for fields, the result panel, and a few section dividers.
  */
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
-  --canvas: #010102;
-  --surface-1: #0f1011;
-  --surface-2: #141516;
-  --surface-3: #18191a;
-  --surface-4: #191a1b;
-  --hairline: #23252a;
-  --hairline-strong: #34343a;
+  --paper: #f6f4ef;
+  --surface: #ffffff;
+  --surface-sunken: #efece5;
+  --ink: #1b1a17;
+  --ink-muted: #4a4740;
+  --ink-subtle: #6b675f;
+  --rule: #ddd8ce;
+  /* Darkened from #BDB6A8 so field borders reach 3:1 on white (WCAG 1.4.11). */
+  --rule-strong: #8f877a;
+  --accent: #7a1f2b;
+  --accent-hover: #5f1721;
+  --accent-soft: #f3e6e7;
+  --focus: #1f4fa8;
+  --positive: #2f6b3f;
+  --caution: #8a5a00;
+  --caution-soft: #f7eedb;
+  --danger: #a32020;
 
-  --ink: #f7f8f8;
-  --ink-muted: #d0d6e0;
-  --ink-subtle: #8a8f98;
+  --font-sans-stack: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+  --font-serif-stack: "Lora Variable", Georgia, "Times New Roman", serif;
 
-  --primary: #5e6ad2;
-  --primary-hover: #828fff;
-  --primary-focus: #5e69d1;
-  --primary-foreground: #ffffff;
-
-  --success: #27a644;
-
-  --background: var(--canvas);
-  --foreground: var(--ink);
-  --card: var(--surface-1);
-  --card-foreground: var(--ink);
-  --popover: var(--surface-2);
-  --popover-foreground: var(--ink);
-  --secondary: var(--surface-2);
-  --secondary-foreground: var(--ink);
-  --muted: var(--surface-2);
-  --muted-foreground: var(--ink-subtle);
-  --accent: var(--surface-3);
-  --accent-foreground: var(--ink);
-  --destructive: #c94b4b;
-  --destructive-foreground: #ffffff;
-  --border: var(--hairline);
-  --input: var(--hairline-strong);
-  --ring: var(--primary);
-
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-
-  font-family: Inter, "SF Pro Display", ui-sans-serif, system-ui, -apple-system,
-    "Segoe UI", sans-serif;
+  font-family: var(--font-sans-stack);
+  font-size: 16px;
+  line-height: 1.55;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
 
 @theme inline {
-  --color-canvas: var(--canvas);
-  --color-surface-1: var(--surface-1);
-  --color-surface-2: var(--surface-2);
-  --color-surface-3: var(--surface-3);
-  --color-surface-4: var(--surface-4);
-  --color-hairline: var(--hairline);
-  --color-hairline-strong: var(--hairline-strong);
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-sunken: var(--surface-sunken);
   --color-ink: var(--ink);
   --color-ink-muted: var(--ink-muted);
   --color-ink-subtle: var(--ink-subtle);
-  --color-primary: var(--primary);
-  --color-primary-hover: var(--primary-hover);
-  --color-primary-focus: var(--primary-focus);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-success: var(--success);
-
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
   --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-focus: var(--focus);
+  --color-positive: var(--positive);
+  --color-caution: var(--caution);
+  --color-caution-soft: var(--caution-soft);
+  --color-danger: var(--danger);
 
-  --font-sans: Inter, "SF Pro Display", ui-sans-serif, system-ui, -apple-system,
-    "Segoe UI", sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas,
-    monospace;
+  --font-sans: var(--font-sans-stack);
+  --font-serif: var(--font-serif-stack);
+  /* No monospace family in this project: numbers use Inter tabular figures. */
+  --font-mono: var(--font-sans-stack);
 
-  --radius-sm: var(--radius-sm);
-  --radius-md: var(--radius-md);
-  --radius-lg: var(--radius-lg);
-  --radius-xl: var(--radius-xl);
+  --radius-sm: 4px;
+  --radius-md: 6px;
 }
 
 @layer base {
-  * {
-    border-color: var(--border);
-  }
-
   html {
-    background-color: var(--canvas);
+    background-color: var(--paper);
   }
 
   body {
     margin: 0;
     min-height: 100vh;
-    background-color: var(--canvas);
+    background-color: var(--paper);
     color: var(--ink);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
+  * {
+    border-color: var(--rule);
+  }
+
   ::selection {
-    background-color: color-mix(in srgb, var(--primary) 45%, transparent);
+    background-color: var(--accent-soft);
+    color: var(--ink);
   }
 
   :focus-visible {
-    outline: 2px solid var(--ring);
+    outline: 2px solid var(--focus);
     outline-offset: 2px;
+  }
+
+  mark {
+    background-color: var(--accent-soft);
+    color: inherit;
+    border-radius: 2px;
+    padding: 0 1px;
+  }
+}
+
+@layer utilities {
+  /* Case numbers, articles, table figures. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum", "zero";
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
