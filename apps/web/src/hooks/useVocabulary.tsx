@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -44,12 +45,16 @@ export function VocabularyProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const { index } = useIndexStatus();
 
+  const requestId = useRef(0);
   const refresh = useCallback(async () => {
+    const current = ++requestId.current;
     try {
       const response = await api.vocabulary();
+      if (current !== requestId.current) return;
       setVocabulary(response);
       setError(null);
     } catch (caught) {
+      if (current !== requestId.current) return;
       setError(caught instanceof Error ? caught.message : 'Daftar kategori tidak tersedia');
     }
   }, []);

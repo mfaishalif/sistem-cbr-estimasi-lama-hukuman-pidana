@@ -449,10 +449,10 @@ describe('attribute normalization at write time', () => {
     const attributes = getCaseUnit(db, unitId)?.facts.attributes ?? {};
     expect(attributes).not.toHaveProperty('education');
     expect(attributes).not.toHaveProperty('occupation');
-    expect(attributes.gender).toEqual({ type: 'enum', value: 'laki-laki' });
+    expect(attributes.gender).toEqual({ type: 'enum', value: 'Laki-Laki' });
   });
 
-  it('normalizes set members through the same rule', () => {
+  it('preserves set values outside education and occupation', () => {
     expect(
       normalizeFactValue('weapon_or_mode', {
         type: 'set',
@@ -460,13 +460,20 @@ describe('attribute normalization at write time', () => {
       }),
     ).toEqual({
       type: 'set',
-      value: JSON.stringify(['senjata tajam', 'senjata-tajam']),
+      value: JSON.stringify(['Senjata  Tajam', 'senjata-tajam', '']),
     });
     expect(normalizeFactValue('education', { type: 'text', value: 'terdakwa' })).toBeNull();
   });
 });
 
 describe('case list filters, previews, and vocabulary', () => {
+  it('reserves the uncategorized filter value on create and update', () => {
+    const reserved = { ...draft, category: ' __none__ ' };
+    expect(() => createCaseUnit(db, reserved)).toThrow('dicadangkan');
+    const id = createCaseUnit(db, draft);
+    expect(() => updateCaseUnit(db, id, reserved)).toThrow('dicadangkan');
+  });
+
   it('combines an exact category filter with search and keeps total consistent', () => {
     createCaseUnit(db, {
       ...draft,

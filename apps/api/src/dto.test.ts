@@ -91,7 +91,7 @@ describe('API input parsing', () => {
 
     expect(draft.attributes?.education).toEqual({ type: 'text', value: 'sma' });
     expect(draft.attributes?.occupation).toEqual({ type: 'text', value: 'swasta' });
-    expect(draft.attributes).not.toHaveProperty('role');
+    expect(draft.attributes?.role).toEqual({ type: 'text', value: 'terdakwa' });
   });
 
   it('rejects malformed facts with a domain validation message', () => {

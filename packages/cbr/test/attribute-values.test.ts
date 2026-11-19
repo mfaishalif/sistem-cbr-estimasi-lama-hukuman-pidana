@@ -49,7 +49,9 @@ describe('attribute value normalization', () => {
     expect(normalizeAttributeValue('education', 'SLTA')).toBe('sma');
     expect(normalizeAttributeValue('occupation', 'tani')).toBe('petani');
     expect(normalizeAttributeValue('gender', 'Laki-Laki')).toBe('laki-laki');
-    expect(normalizeAttributeValue('role', 'terdakwa')).toBeNull();
-    expect(normalizeAttributeValue('role', '-')).toBeNull();
+    expect(normalizeAttributeValue('role', 'Terdakwa utama')).toBe('terdakwa utama');
+    expect(normalizeAttributeValue('role', '-')).toBe('-');
+    expect(normalizeEducation('constructor')).toBe('constructor');
+    expect(normalizeOccupation('constructor')).toBe('constructor');
   });
 });

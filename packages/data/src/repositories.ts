@@ -250,42 +250,13 @@ export function validateFactValue(key: string, value: FactValue): FactValue {
  * source locations are preserved.
  */
 export function normalizeFactValue(key: string, value: FactValue): FactValue | null {
-  if (value.type === 'text' || value.type === 'enum') {
-    if (typeof value.value !== 'string') {
-      return value;
-    }
-    const normalized = normalizeAttributeValue(key, value.value);
-    if (normalized === null) {
-      return null;
-    }
-    return { ...value, value: normalized };
+  if ((key !== 'education' && key !== 'occupation') ||
+      (value.type !== 'text' && value.type !== 'enum') ||
+      typeof value.value !== 'string') {
+    return value;
   }
-
-  if (value.type === 'set') {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(value.value);
-    } catch {
-      // Leave malformed JSON for validateFactValue to reject.
-      return value;
-    }
-    if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== 'string')) {
-      return value;
-    }
-    const values = [
-      ...new Set(
-        parsed
-          .map((item) => normalizeAttributeValue(key, item))
-          .filter((item): item is string => item !== null),
-      ),
-    ].sort();
-    if (values.length === 0) {
-      return null;
-    }
-    return { ...value, value: JSON.stringify(values) };
-  }
-
-  return value;
+  const normalized = normalizeAttributeValue(key, value.value);
+  return normalized === null ? null : { ...value, value: normalized };
 }
 
 function normalizedAttributeEntries(
@@ -351,7 +322,7 @@ export function createCaseUnit(
   const caseNumber = requireText(draft.caseNumber, 'caseNumber');
   const narration = requireText(draft.narration, 'narration');
   const defendantName = draft.defendantName?.trim() || null;
-  const category = draft.category?.trim() || null;
+  const category = normalizeStoredCategory(draft.category);
   const categorySourceLocation = draft.categorySourceLocation?.trim() || null;
   const actualSentenceDays = draft.actualSentenceDays ?? null;
   const identity = normalizeCaseIdentity(court, caseNumber);
@@ -462,7 +433,7 @@ export function updateCaseUnit(
   const caseNumber = requireText(draft.caseNumber, 'caseNumber');
   const narration = requireText(draft.narration, 'narration');
   const defendantName = draft.defendantName?.trim() || null;
-  const category = draft.category?.trim() || null;
+  const category = normalizeStoredCategory(draft.category);
   const categorySourceLocation = draft.categorySourceLocation?.trim() || null;
   const identity = normalizeCaseIdentity(court, caseNumber);
   const actualSentenceDays =
@@ -896,6 +867,14 @@ export function listCaseUnits(db: DatabaseSync, limit = 50): CaseUnit[] {
 }
 
 /** Special category filter value meaning "category IS NULL". */
+function normalizeStoredCategory(value: string | null | undefined): string | null {
+  const category = value?.trim() || null;
+  if (category === NONE_CATEGORY) {
+    throw new ValidationError('Kategori __none__ dicadangkan untuk filter tanpa kategori');
+  }
+  return category;
+}
+
 export const NONE_CATEGORY = '__none__';
 
 export interface CaseUnitListOptions {

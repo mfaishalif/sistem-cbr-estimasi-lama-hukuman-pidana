@@ -126,7 +126,8 @@ export function normalizeEducation(raw: string): string | null {
   if (isUnknownOrInvalid(text)) {
     return null;
   }
-  return EDUCATION_ALIASES[aliasLookupKey(text)] ?? text;
+  const key = aliasLookupKey(text);
+  return Object.hasOwn(EDUCATION_ALIASES, key) ? EDUCATION_ALIASES[key] ?? text : text;
 }
 
 export function normalizeOccupation(raw: string): string | null {
@@ -134,7 +135,8 @@ export function normalizeOccupation(raw: string): string | null {
   if (isUnknownOrInvalid(text)) {
     return null;
   }
-  return OCCUPATION_ALIASES[aliasLookupKey(text)] ?? text;
+  const key = aliasLookupKey(text);
+  return Object.hasOwn(OCCUPATION_ALIASES, key) ? OCCUPATION_ALIASES[key] ?? text : text;
 }
 
 /**
@@ -148,6 +150,5 @@ export function normalizeAttributeValue(key: string, raw: string): string | null
   if (key === 'occupation') {
     return normalizeOccupation(raw);
   }
-  const text = canonicalText(raw);
-  return isUnknownOrInvalid(text) ? null : text;
+  return raw.trim().toLowerCase().replace(/\s+/g, ' ') || null;
 }

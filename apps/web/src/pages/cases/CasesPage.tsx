@@ -28,7 +28,7 @@ export function CasesPage({ caseId }: { caseId: string | null }) {
   const [reload, setReload] = useState(0);
   const [creating, setCreating] = useState(false);
   const requestId = useRef(0);
-  const { categories, uncategorizedCount } = useVocabulary();
+  const { vocabulary, categories, uncategorizedCount } = useVocabulary();
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -37,6 +37,14 @@ export function CasesPage({ caseId }: { caseId: string | null }) {
     }, 300);
     return () => window.clearTimeout(timer);
   }, [search]);
+
+  useEffect(() => {
+    if (vocabulary !== null && category !== '' && category !== NONE_CATEGORY &&
+        !categories.some((option) => option.value === category)) {
+      setCategory('');
+      setOffset(0);
+    }
+  }, [vocabulary, category, categories]);
 
   const load = useCallback(async () => {
     const current = requestId.current + 1;
