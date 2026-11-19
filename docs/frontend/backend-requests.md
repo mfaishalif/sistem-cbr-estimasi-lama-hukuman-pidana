@@ -46,13 +46,12 @@ pada evaluasi:
 | `smoothInverseDocumentFrequency` | `true` |
 
 `GET /api/config` mengembalikan fingerprint `bd4fadb2b7402393`, sama dengan
-fingerprint artefak evaluasi. Drawer "Cara kerja" hanya menyatakan konfigurasi
-aplikasi sama dengan evaluasi bila fingerprint itu cocok; bila berbeda, ia
-tetap menyebut bahwa hasil aplikasi dapat berbeda.
+fingerprint artefak evaluasi. Drawer "Cara kerja" menampilkan alur 4R, rumus,
+dan bobot aplikasi; hasil evaluasi tidak lagi ditampilkan di panel itu.
 
-Catatan penting untuk UI: cakupan 98,62% dan MAE 371,7 hari adalah **hasil uji
-historis sebelum normalisasi atribut**. Angka itu tidak dihitung ulang pada
-basis kasus yang sudah dinormalisasi.
+Catatan penting: cakupan 98,62% dan MAE 371,7 hari adalah **hasil uji historis
+sebelum normalisasi atribut**. Angka itu tidak dihitung ulang pada basis kasus
+yang sudah dinormalisasi.
 
 ## 2. Normalisasi `education` dan `occupation`
 
@@ -218,5 +217,4 @@ node tools/cli/dist/index.js import `
 - Dengan hanya satu referensi yang lolos, estimasi ditahan dengan kode
   `REFERENSI_TIDAK_CUKUP`.
 - Pemeriksaan Playwright: filter gabungan, paginasi, pratinjau desktop dan
-  ponsel, pilihan form, penyegaran kosakata setelah simpan, dan catatan
-  fingerprint di "Cara kerja".
+  ponsel, pilihan form, serta penyegaran kosakata setelah simpan.

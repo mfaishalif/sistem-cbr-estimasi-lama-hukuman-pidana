@@ -65,6 +65,16 @@ export function newArticleRow(initial: Partial<ArticleRowState> = {}): ArticleRo
   };
 }
 
+/** The sample chronology always starts from a theft under KUHP 363(1). */
+export function fillSample(form: CaseFormState, narration: string): CaseFormState {
+  return {
+    ...form,
+    narration,
+    category: 'pencurian',
+    articles: [newArticleRow({ article: '363', paragraph: '1' })],
+  };
+}
+
 export function emptyCaseForm(): CaseFormState {
   return {
     court: '',

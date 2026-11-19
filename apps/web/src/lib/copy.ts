@@ -71,7 +71,7 @@ export const copy = {
     narrationPlaceholder:
       'Contoh: Pada malam hari terdakwa masuk ke halaman rumah korban, mengambil sepeda motor yang diparkir tanpa izin, lalu menjualnya kepada orang lain dengan harga murah.',
     sample:
-      'Terdakwa mengambil sepeda motor milik korban yang diparkir di depan rumah tanpa izin pada malam hari, lalu menjualnya kepada orang lain dengan harga murah.',
+      'Pada hari Selasa sekitar pukul 21.00 WIB, terdakwa datang ke masjid dengan mengendarai sepeda motor. Terdakwa memarkir sepeda motor di depan masjid lalu masuk ke dalam masjid. Setelah keluar dari kamar mandi, terdakwa mendekati kotak amal masjid yang dalam keadaan terkunci.\n\nTerdakwa merusak gembok kotak amal. Setelah kotak amal terbuka, terdakwa mengambil uang tunai yang ada di dalam kotak amal tanpa izin pengurus masjid. Uang tersebut dimasukkan ke dalam tas milik terdakwa.\n\nTakmir masjid yang sedang beristirahat di kamar mendengar suara dari arah kotak amal. Ia keluar dari kamar dan melihat terdakwa di depan kotak amal. Saat diperiksa, kotak amal sudah terbuka, gembok rusak, dan uang di dalam kotak amal sudah tidak ada. Terdakwa berusaha melarikan diri dari masjid, tetapi diamankan oleh warga dan dibawa ke kantor polisi. Pengurus masjid kemudian menyerahkan gembok yang rusak dan tas berisi uang sebagai barang bukti.',
     fillSample: 'Isi contoh',
     categoryLabel: 'Kategori perkara',
     categoryUnknown: 'Belum diketahui (cari di semua kategori)',
