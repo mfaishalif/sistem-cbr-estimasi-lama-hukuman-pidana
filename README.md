@@ -79,7 +79,7 @@ estimasi sebagai hasil aktual; isi hasil aktual hanya dari putusan yang sudah
 diketahui.
 
 1. Jalankan `docker compose up --build`, lalu buka <http://localhost:3000>.
-   Periksa badge indeks dan kartu **Konfigurasi retrieval aktif** di Ringkasan.
+   Baca contoh rekaan di **Ringkasan** dan periksa badge indeks.
 2. Buka **Basis kasus** → **Kasus baru**. Tambahkan dua atau tiga kasus sintetis
    dengan pengadilan, nomor perkara, narasi pra-putusan, kategori yang sama
    (misalnya `pencurian`), dan hasil aktual yang berbeda (misalnya 240, 360, dan
@@ -108,7 +108,7 @@ Alur pada panduan ini sudah dicoba pada 18 November 2026 dari checkout bersih
 
 | Tindakan | Hasil yang diharapkan dan diperiksa |
 | --- | --- |
-| `docker compose up -d --build` pada checkout tanpa `node_modules` | Build berhasil; `/api/health` melaporkan skema `002`, 0 unit, dan indeks `siap`. Ringkasan menampilkan fingerprint `config/retrieval.json`. |
+| `docker compose up -d --build` pada checkout tanpa `node_modules` | Build berhasil; `/api/health` melaporkan skema `002`, 0 unit, dan indeks `siap`. `/api/config` menampilkan fingerprint `config/retrieval.json`. |
 | Tambah tiga kasus `pencurian` lewat UI dengan hasil aktual 240, 360, dan 540 hari | Daftar menampilkan 3 unit; setiap detail menampilkan hasil aktual yang disimpan. Indeks menjadi perlu dibangun ulang setelah mutasi. |
 | Retrieve dengan narasi serupa | Estimasi 315 hari dari 3 referensi; skor 0,823 / 0,461 / 0,181; hasil aktual referensi 240–540 hari; kartu referensi menampilkan komponen skor dan perhitungan berbobot. |
 | Retrieve dengan narasi kosong | Ditolak sebelum estimasi dengan pesan narasi wajib. |
@@ -131,8 +131,7 @@ mengisi angka. Status indeks dapat berupa `siap`, `perlu dibangun ulang`,
 
 Konfigurasi aktif berada di [`config/retrieval.json`](config/retrieval.json) dan
 disalin ke image saat build. Untuk mengubahnya, edit file tersebut lalu jalankan
-`docker compose up --build`; UI hanya menampilkan konfigurasi yang tersimpan,
-tidak menyediakan angka tersembunyi yang dapat diubah.
+`docker compose up --build`. Periksa konfigurasi yang tersimpan lewat `/api/config`.
 
 ### Endpoint API
 
@@ -583,8 +582,9 @@ dilepas; bila build gagal, estimasi ditahan, bukan diisi dengan hasil basi.
 
 1. `npm ci && npm run typecheck && npm test && npm run build`
 2. `docker compose up --build`, lalu buka `http://localhost:3000` dan
-   `http://localhost:3000/api/health`. Ringkasan harus menampilkan fingerprint
-   konfigurasi, sumber `config/retrieval.json`, dan status indeks.
+   `http://localhost:3000/api/health`. Ringkasan menampilkan cara kerja estimasi
+   dengan contoh 4R. Cek fingerprint dan sumber `config/retrieval.json` lewat
+   `/api/config`, serta status indeks lewat `/api/index/status`.
 3. Migrasi database kosong: hapus volume **hanya untuk pemeriksaan** dengan
    `docker compose down -v`, lalu `docker compose up --build`; status skema
    harus `002`.
