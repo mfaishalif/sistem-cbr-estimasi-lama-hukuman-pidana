@@ -1,8 +1,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { performance } from 'node:perf_hooks';
-import { FACT_ATTRIBUTE_KEYS } from '@cbr/core';
-import type { CaseUnitDraft } from '@cbr/core';
+import { FACT_ATTRIBUTE_KEYS, normalizeAttributeValue } from '@cbr/core';
+import type { CaseUnitDraft, FactValue } from '@cbr/core';
 import {
   clearCaseBase,
   closeDatabase,
@@ -439,6 +439,49 @@ function buildGroups(cases: readonly ExtractedCase[]): {
   };
 }
 
+/** Comparable text for one stored value; null when it cannot be represented. */
+function rawAttributeText(value: FactValue): string | null {
+  switch (value.type) {
+    case 'text':
+    case 'enum':
+    case 'set':
+      return value.value;
+    case 'number':
+      return String(value.value);
+    case 'boolean':
+      return value.value ? 'true' : 'false';
+    default:
+      return null;
+  }
+}
+
+/** The value the shared rule would write, or null when it is discarded. */
+function canonicalAttributeText(key: string, value: FactValue): string | null {
+  if (value.type === 'text' || value.type === 'enum') {
+    return normalizeAttributeValue(key, value.value);
+  }
+  if (value.type === 'set') {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(value.value);
+    } catch {
+      return null;
+    }
+    if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== 'string')) {
+      return null;
+    }
+    const values = [
+      ...new Set(
+        parsed
+          .map((item) => normalizeAttributeValue(key, item))
+          .filter((item): item is string => item !== null),
+      ),
+    ].sort();
+    return values.length === 0 ? null : values.join('|');
+  }
+  return rawAttributeText(value);
+}
+
 function buildReport(
   accumulator: ImportAccumulator,
   cases: readonly ExtractedCase[],
@@ -463,9 +506,19 @@ function buildReport(
   }
 
   const categories: Record<string, number> = {};
-  const attributes: Record<string, { present: number; total: number }> = {};
+  const attributes: ImportReport['attributes'] = {};
+  const uniqueBefore = new Map<string, Set<string>>();
+  const uniqueAfter = new Map<string, Set<string>>();
   for (const key of FACT_ATTRIBUTE_KEYS) {
-    attributes[key] = { present: 0, total: cases.length };
+    attributes[key] = {
+      present: 0,
+      total: cases.length,
+      uniqueValuesBefore: 0,
+      uniqueValuesAfter: 0,
+      discarded: 0,
+    };
+    uniqueBefore.set(key, new Set());
+    uniqueAfter.set(key, new Set());
   }
   let categoryUnknown = 0;
   const outcomes = { metadataOnly: 0, metadataAndVerdict: 0 };
@@ -476,19 +529,43 @@ function buildReport(
     } else {
       categories[candidate.category] = (categories[candidate.category] ?? 0) + 1;
     }
-    for (const key of Object.keys(candidate.attributes)) {
-      const entry = attributes[key];
-      if (entry !== undefined) {
-        entry.present += 1;
-      } else {
-        attributes[key] = { present: 1, total: cases.length };
+    for (const [key, value] of Object.entries(candidate.attributes)) {
+      const entry = attributes[key] ?? {
+        present: 0,
+        total: cases.length,
+        uniqueValuesBefore: 0,
+        uniqueValuesAfter: 0,
+        discarded: 0,
+      };
+      attributes[key] = entry;
+
+      const raw = rawAttributeText(value);
+      if (raw !== null) {
+        const bucket = uniqueBefore.get(key) ?? new Set<string>();
+        bucket.add(raw);
+        uniqueBefore.set(key, bucket);
       }
+
+      const canonical = canonicalAttributeText(key, value);
+      if (canonical === null) {
+        entry.discarded += 1;
+        continue;
+      }
+      entry.present += 1;
+      const bucket = uniqueAfter.get(key) ?? new Set<string>();
+      bucket.add(canonical);
+      uniqueAfter.set(key, bucket);
     }
     if (candidate.outcomeKind === 'metadata') {
       outcomes.metadataOnly += 1;
     } else {
       outcomes.metadataAndVerdict += 1;
     }
+  }
+
+  for (const [key, entry] of Object.entries(attributes)) {
+    entry.uniqueValuesBefore = uniqueBefore.get(key)?.size ?? 0;
+    entry.uniqueValuesAfter = uniqueAfter.get(key)?.size ?? 0;
   }
 
   return {

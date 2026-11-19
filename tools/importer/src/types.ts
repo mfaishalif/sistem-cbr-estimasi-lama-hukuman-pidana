@@ -117,7 +117,20 @@ export interface ImportReport {
   skipReasons: Array<{ code: SkipCode; count: number; examples: string[] }>;
   categories: Record<string, number>;
   categoryUnknown: number;
-  attributes: Record<string, { present: number; total: number }>;
+  attributes: Record<
+    string,
+    {
+      /** Units whose value survives normalization and is written to the case base. */
+      present: number;
+      total: number;
+      /** Distinct raw values before normalization, over deduplicated case units. */
+      uniqueValuesBefore: number;
+      /** Distinct canonical values after normalization, over deduplicated case units. */
+      uniqueValuesAfter: number;
+      /** Units whose raw value normalized away and was therefore not written. */
+      discarded: number;
+    }
+  >;
   outcomes: {
     metadataOnly: number;
     metadataAndVerdict: number;

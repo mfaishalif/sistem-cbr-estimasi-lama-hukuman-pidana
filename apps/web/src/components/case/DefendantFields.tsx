@@ -1,15 +1,23 @@
 import { Field, describedBy } from '@/components/ui/field';
 import { errorFor } from '@/components/ui/error-summary';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { Segmented } from '@/components/ui/toggle-group';
+import { useVocabulary } from '@/hooks/useVocabulary';
 import type { CaseFormState } from '@/lib/case-form';
-import { GENDERS, PRIOR_CONVICTION, humanizeSlug } from '@/lib/vocabulary';
+import {
+  GENDERS,
+  PRIOR_CONVICTION,
+  educationOptions,
+  humanizeSlug,
+} from '@/lib/vocabulary';
 import { FORM_GRID, SECTION_BODY, SECTION_HEADING, span } from './layout';
 import type { FieldsProps } from './types';
 
 const UNKNOWN = { value: '', label: 'Belum diketahui' };
 
 export function DefendantFields({ idPrefix, form, patch, errors, disabled }: FieldsProps) {
+  const { occupation: occupationSuggestions } = useVocabulary();
   const ageError = errorFor(errors, 'age');
   const dateError = errorFor(errors, 'age-date');
   const genderOptions = [UNKNOWN, ...GENDERS];
@@ -69,24 +77,43 @@ export function DefendantFields({ idPrefix, form, patch, errors, disabled }: Fie
         )}
 
         <Field id={`${idPrefix}-education`} label="Pendidikan" className="col-span-6 col-start-1">
-          <Input
+          <Select
             id={`${idPrefix}-education`}
             value={form.education}
             onChange={(event) => patch({ education: event.target.value })}
-            placeholder="Misalnya SMA"
-            autoComplete="off"
             disabled={disabled}
-          />
+          >
+            <option value="">Belum diketahui</option>
+            {educationOptions(form.education).map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
         </Field>
-        <Field id={`${idPrefix}-occupation`} label="Pekerjaan" className="col-span-6">
+        <Field
+          id={`${idPrefix}-occupation`}
+          label="Pekerjaan"
+          hint="Saran dari putusan yang paling sering tercatat; pekerjaan lain tetap boleh diketik."
+          className="col-span-6"
+        >
           <Input
             id={`${idPrefix}-occupation`}
+            list={`${idPrefix}-occupation-options`}
             value={form.occupation}
             onChange={(event) => patch({ occupation: event.target.value })}
             placeholder="Misalnya swasta"
+            aria-describedby={describedBy(`${idPrefix}-occupation`, { hint: true })}
             autoComplete="off"
             disabled={disabled}
           />
+          <datalist id={`${idPrefix}-occupation-options`}>
+            {occupationSuggestions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {humanizeSlug(option.value)}
+              </option>
+            ))}
+          </datalist>
         </Field>
 
         <Field id={`${idPrefix}-prior`} label="Riwayat dihukum" asGroup className={span.full}>

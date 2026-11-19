@@ -142,6 +142,7 @@ export const copy = {
       caseNumber: 'Nomor perkara',
       court: 'Pengadilan',
       category: 'Kategori',
+      narration: 'Kronologi',
       sentence: 'Hukuman',
       updated: 'Diperbarui',
     },

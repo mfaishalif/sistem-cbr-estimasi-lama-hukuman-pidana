@@ -5,7 +5,7 @@ import { copy } from '@/lib/copy';
 import { formatDayCount, formatSentence } from '@/lib/duration';
 import { ATTRIBUTE_ORDER, formatArticle, recordedFacts } from '@/lib/facts';
 import { formatDate } from '@/lib/format';
-import { categoryLabel } from '@/lib/vocabulary';
+import { categoryDisplay } from '@/lib/vocabulary';
 import { OutcomeEditor } from './OutcomeEditor';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -145,7 +145,7 @@ export function CaseDetailView({ unit, onUnitChange }: { unit: CaseUnit; onUnitC
             ['Pengadilan', unit.identity.court],
             ['Nomor perkara', <span className="tabular">{unit.identity.caseNumber}</span>],
             ['Nama terdakwa', unit.identity.defendantName ?? '—'],
-            ['Kategori', categoryLabel(unit.facts.category) ?? '—'],
+            ['Kategori', categoryDisplay(unit.facts.category)],
             ['Ditambahkan', formatDate(unit.createdAt)],
             ['Diperbarui', formatDate(unit.updatedAt)],
           ]}

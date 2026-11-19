@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { CaseDrawer } from '@/components/cases/CaseDrawer';
 import { CaseEditor } from '@/components/cases/CaseEditor';
@@ -7,11 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { useVocabulary } from '@/hooks/useVocabulary';
 import { api, type CaseListResponse } from '@/lib/api';
 import { copy } from '@/lib/copy';
 import { formatInteger } from '@/lib/format';
 import { caseHref } from '@/lib/route';
-import { CATEGORIES } from '@/lib/vocabulary';
+import { NONE_CATEGORY, UNCATEGORIZED_LABEL } from '@/lib/vocabulary';
 
 const LIMIT = 20;
 
@@ -26,6 +27,8 @@ export function CasesPage({ caseId }: { caseId: string | null }) {
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const [creating, setCreating] = useState(false);
+  const requestId = useRef(0);
+  const { categories, uncategorizedCount } = useVocabulary();
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -35,24 +38,29 @@ export function CasesPage({ caseId }: { caseId: string | null }) {
     return () => window.clearTimeout(timer);
   }, [search]);
 
-  // TEMPORARY: the category filter rides on `q` (which also matches court,
-  // case number and name) until the API offers `category=`. Search text and
-  // category are therefore mutually exclusive; choosing one clears the other.
-  const q = debounced !== '' ? debounced : category;
-
   const load = useCallback(async () => {
+    const current = requestId.current + 1;
+    requestId.current = current;
     setLoading(true);
     setError(null);
     try {
-      const response = await api.listCases({ limit: LIMIT, offset, q });
+      const response = await api.listCases({
+        limit: LIMIT,
+        offset,
+        q: debounced,
+        category,
+      });
+      // A slower response for an older filter must not replace a newer one.
+      if (current !== requestId.current) return;
       setList(response);
-      if (q === '') setBaseTotal(response.total);
+      if (debounced === '' && category === '') setBaseTotal(response.total);
     } catch (caught) {
+      if (current !== requestId.current) return;
       setError(`Daftar perkara tidak dapat dimuat: ${caught instanceof Error ? caught.message : 'server tidak menjawab'}.`);
     } finally {
-      setLoading(false);
+      if (current === requestId.current) setLoading(false);
     }
-  }, [offset, q]);
+  }, [offset, debounced, category]);
 
   useEffect(() => {
     void load();
@@ -86,10 +94,7 @@ export function CasesPage({ caseId }: { caseId: string | null }) {
             id="cases-search"
             type="search"
             value={search}
-            onChange={(event) => {
-              setSearch(event.target.value);
-              if (event.target.value !== '') setCategory('');
-            }}
+            onChange={(event) => setSearch(event.target.value)}
             placeholder={copy.cases.searchPlaceholder}
           />
         </div>
@@ -100,15 +105,16 @@ export function CasesPage({ caseId }: { caseId: string | null }) {
             value={category}
             onChange={(event) => {
               setCategory(event.target.value);
-              setSearch('');
-              setDebounced('');
               setOffset(0);
             }}
           >
             <option value="">{copy.cases.allCategories}</option>
-            {CATEGORIES.map((option) => (
+            <option value={NONE_CATEGORY}>
+              {UNCATEGORIZED_LABEL} ({formatInteger(uncategorizedCount)})
+            </option>
+            {categories.map((option) => (
               <option key={option.value} value={option.value}>
-                {option.label}
+                {option.caseCount > 0 ? `${option.label} (${formatInteger(option.caseCount)})` : option.label}
               </option>
             ))}
           </Select>
@@ -128,7 +134,9 @@ export function CasesPage({ caseId }: { caseId: string | null }) {
             ))}
           </div>
         ) : items.length === 0 ? (
-          <p className="text-[15px] text-ink-muted">{q === '' ? copy.cases.emptyBase : copy.cases.empty}</p>
+          <p className="text-[15px] text-ink-muted">
+            {debounced === '' && category === '' ? copy.cases.emptyBase : copy.cases.empty}
+          </p>
         ) : (
           <div className={loading ? 'opacity-60 transition-opacity' : undefined}>
             <CaseTable items={items} />

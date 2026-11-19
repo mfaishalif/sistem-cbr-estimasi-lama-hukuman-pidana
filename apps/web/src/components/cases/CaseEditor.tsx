@@ -111,7 +111,7 @@ export function CaseEditor({ open, onOpenChange, unit, onSaved }: CaseEditorProp
         <IdentityFields idPrefix={PREFIX} value={form} onChange={patch} errors={errors} disabled={saving} />
         <div className={FORM_GRID}>
           <NarrationField {...fields} />
-          <CategoryField {...fields} unknownLabel="Belum diketahui" />
+          <CategoryField {...fields} unknownLabel="Belum diketahui" allowCustom />
         </div>
         <CaseDetailsFields {...fields} defaultOpen={unit !== undefined && detailSummary(caseFormFromUnit(unit)).length > 0} />
         <SentenceInput

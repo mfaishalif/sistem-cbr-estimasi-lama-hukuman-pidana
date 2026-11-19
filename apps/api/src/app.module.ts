@@ -7,10 +7,11 @@ import { CbrService } from './cbr.service';
 import { CasesService } from './cases.service';
 import { CasesController } from './cases.controller';
 import { EstimateController } from './estimate.controller';
+import { VocabularyController } from './vocabulary.controller';
 import { ValidationErrorFilter } from './validation.filter';
 
 @Module({
-  controllers: [HealthController, CasesController, EstimateController],
+  controllers: [HealthController, CasesController, EstimateController, VocabularyController],
   providers: [
     DatabaseService,
     RetrievalConfigService,

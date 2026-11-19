@@ -21,11 +21,13 @@ export class CasesController {
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
     @Query('q') query?: string,
+    @Query('category') category?: string,
   ) {
     return this.cases.list({
       limit: limit === undefined ? undefined : Number(limit),
       offset: offset === undefined ? undefined : Number(offset),
       query,
+      category,
     });
   }
 

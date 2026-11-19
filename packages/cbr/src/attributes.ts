@@ -11,6 +11,7 @@ import type {
   AttributeComparator,
   RetrievalConfig,
 } from './config';
+import { normalizeAttributeValue } from './attribute-values';
 import type { CaseArticleDraft, CaseFacts, FactValue } from './model';
 import { normalizeNarrative } from './text';
 
@@ -49,12 +50,7 @@ function attributeValue(facts: CaseFacts, key: string): FactValue | undefined {
   return facts.attributes?.[key];
 }
 
-function normalizedText(value: string): string | null {
-  const normalized = value.trim().toLowerCase().replace(/\s+/g, ' ');
-  return normalized === '' ? null : normalized;
-}
-
-function parseSet(value: FactValue): string[] | null {
+function parseSet(key: string, value: FactValue): string[] | null {
   if (value.type !== 'set') {
     return null;
   }
@@ -70,7 +66,7 @@ function parseSet(value: FactValue): string[] | null {
   const values = [
     ...new Set(
       parsed
-        .map((item) => normalizedText(item))
+        .map((item) => normalizeAttributeValue(key, item))
         .filter((item): item is string => item !== null),
     ),
   ].sort();
@@ -138,13 +134,13 @@ export function extractAttribute(
           value: value.value ? 'true' : 'false',
         };
       }
-      const text = normalizedText(value.value);
+      const text = normalizeAttributeValue(component.attributeKey, value.value);
       return text === null
         ? null
         : { kind: 'categorical', key: component.attributeKey, value: text };
     }
     case 'set': {
-      const values = parseSet(value);
+      const values = parseSet(component.attributeKey, value);
       return values === null
         ? null
         : { kind: 'set', key: component.attributeKey, values };

@@ -77,6 +77,23 @@ describe('API input parsing', () => {
     ).toThrow(ValidationError);
   });
 
+  it('normalizes attribute values and drops values that carry no information', () => {
+    const draft = parseCaseDraft({
+      court: 'PN Contoh',
+      caseNumber: '1/Pid.B/2024/PN Contoh',
+      narration: 'Narasi.',
+      attributes: {
+        education: { type: 'text', value: ' SLTA ' },
+        occupation: { type: 'text', value: 'Karyawan Swasta' },
+        role: { type: 'text', value: 'terdakwa' },
+      },
+    });
+
+    expect(draft.attributes?.education).toEqual({ type: 'text', value: 'sma' });
+    expect(draft.attributes?.occupation).toEqual({ type: 'text', value: 'swasta' });
+    expect(draft.attributes).not.toHaveProperty('role');
+  });
+
   it('rejects malformed facts with a domain validation message', () => {
     expect(() =>
       parseCaseDraft({

@@ -21,6 +21,7 @@ import {
   singleDefendantCopy,
   specialLaw,
   unknownCategory,
+  xmlDocument,
   zeroOutcome,
 } from '../test/fixtures';
 
@@ -72,8 +73,8 @@ describe('Indo-Law import', () => {
       sourceDocuments: 1,
     });
     expect(report.categories).toEqual({ pencurian: 1 });
-    expect(report.attributes.age_years).toEqual({ present: 1, total: 1 });
-    expect(report.attributes.prior_conviction).toEqual({ present: 1, total: 1 });
+    expect(report.attributes.age_years).toMatchObject({ present: 1, total: 1 });
+    expect(report.attributes.prior_conviction).toMatchObject({ present: 1, total: 1 });
     expect(report.outcomes.metadataAndVerdict).toBe(1);
 
     const units = ids(databasePath, 'SELECT * FROM case_unit');
@@ -92,6 +93,70 @@ describe('Indo-Law import', () => {
       outcome_location: 'amar_putusan',
       source_outcome_kind: 'metadata-and-verdict',
     });
+  });
+
+  it('reports unique values before and after normalization on deduplicated units', () => {
+    const slta = xmlDocument({
+      id: 'doc-slta',
+      sections: {
+        kepala_putusan:
+          'putusan nomor 99 pid b 2024 pn contoh demi keadilan berdasarkan ketuhanan yang maha esa pengadilan negeri contoh yang mengadili perkara pidana dalam tingkat pertama menjatuhkan putusan sebagai berikut dalam perkara terdakwa',
+        identitas:
+          'nama lengkap citra binti dahlan tempat lahir contoh umur tanggal lahir 28 tahun 2 februari 1996 jenis kelamin perempuan kebangsaan indonesia agama islam pekerjaan tani pendidikan slta terdakwa ditahan sejak tanggal 2 juni 2024',
+        riwayat_dakwaan:
+          'bahwa ia terdakwa citra binti dahlan pada hari selasa tanggal 4 juni 2024 mengambil sepeda motor milik korban sebagaimana diatur dan diancam pidana dalam pasal 362 kuhp',
+        amar_putusan:
+          'menyatakan terdakwa citra binti dahlan terbukti bersalah menjatuhkan pidana dengan pidana penjara selama 6 enam bulan',
+      },
+    });
+    const unknown = xmlDocument({
+      id: 'doc-unknown-attribute',
+      sections: {
+        kepala_putusan:
+          'putusan nomor 98 pid b 2024 pn contoh demi keadilan berdasarkan ketuhanan yang maha esa pengadilan negeri contoh yang mengadili perkara pidana dalam tingkat pertama menjatuhkan putusan sebagai berikut dalam perkara terdakwa',
+        identitas:
+          'nama lengkap dodi bin eko tempat lahir contoh umur tanggal lahir 31 tahun 2 februari 1993 jenis kelamin laki laki kebangsaan indonesia agama islam pekerjaan tidak diketahui pendidikan tidak diketahui terdakwa ditahan sejak tanggal 2 juni 2024',
+        riwayat_dakwaan:
+          'bahwa ia terdakwa dodi bin eko pada hari selasa tanggal 4 juni 2024 mengambil sepeda motor milik korban sebagaimana diatur dan diancam pidana dalam pasal 362 kuhp',
+        amar_putusan:
+          'menyatakan terdakwa dodi bin eko terbukti bersalah menjatuhkan pidana dengan pidana penjara selama 6 enam bulan',
+      },
+    });
+
+    const { report, databasePath } = importSnapshot({
+      'a.xml': singleDefendant,
+      'b.xml': slta,
+      'c.xml': unknown,
+    });
+
+    expect(report.counts.casesAccepted).toBe(3);
+    expect(report.attributes.education).toEqual({
+      present: 2,
+      total: 3,
+      uniqueValuesBefore: 3,
+      uniqueValuesAfter: 1,
+      discarded: 1,
+    });
+    expect(report.attributes.occupation).toEqual({
+      present: 2,
+      total: 3,
+      uniqueValuesBefore: 3,
+      uniqueValuesAfter: 2,
+      discarded: 1,
+    });
+
+    const stored = ids(
+      databasePath,
+      `SELECT attribute_key, value_text FROM case_fact_attribute
+        WHERE attribute_key IN ('education', 'occupation')
+        ORDER BY attribute_key, value_text`,
+    );
+    expect(stored).toEqual([
+      { attribute_key: 'education', value_text: 'sma' },
+      { attribute_key: 'education', value_text: 'sma' },
+      { attribute_key: 'occupation', value_text: 'petani' },
+      { attribute_key: 'occupation', value_text: 'swasta' },
+    ]);
   });
 
   it('merges byte-identical and format copies without duplicating units or groups', () => {

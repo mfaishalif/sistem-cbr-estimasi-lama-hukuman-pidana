@@ -4,6 +4,7 @@ import { AppHeader } from '@/components/layout/AppHeader';
 import { HowItWorks } from '@/components/layout/HowItWorks';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { IndexStatusProvider } from '@/hooks/useIndexStatus';
+import { VocabularyProvider } from '@/hooks/useVocabulary';
 import { copy } from '@/lib/copy';
 import { ESTIMATE_HREF, HOME_HREF, isEmptyHash, isLegacyHash, parseHash, type Route } from '@/lib/route';
 import { cn } from '@/lib/utils';
@@ -46,28 +47,30 @@ function App() {
 
   return (
     <IndexStatusProvider>
-      <TooltipProvider delayDuration={150}>
-        <div className="flex min-h-screen flex-col bg-paper text-ink">
-          <AppHeader route={route} onOpenHowItWorks={openHowItWorks} />
-          {/* The landing sets its own vertical rhythm; the other pages keep theirs. */}
-          <main className={cn('mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6', !home && 'pb-20 pt-10 lg:pt-14')}>
-            {home ? <LandingPage onOpenHowItWorks={openHowItWorks} /> : null}
-            {/* Estimasi stays mounted so its form and result survive a visit to another page. */}
-            <div hidden={route.page !== 'estimasi'}>
-              <EstimatePage />
-            </div>
-            {route.page === 'kasus' ? <CasesPage caseId={route.caseId} /> : null}
-          </main>
-          {home ? (
-            <LandingFooter />
-          ) : (
-            <footer className="border-t border-rule">
-              <p className="mx-auto max-w-6xl px-4 py-6 text-[13px] text-ink-subtle sm:px-6">{copy.app.footer}</p>
-            </footer>
-          )}
-          <HowItWorks open={howItWorksOpen} onOpenChange={setHowItWorksOpen} />
-        </div>
-      </TooltipProvider>
+      <VocabularyProvider>
+        <TooltipProvider delayDuration={150}>
+          <div className="flex min-h-screen flex-col bg-paper text-ink">
+            <AppHeader route={route} onOpenHowItWorks={openHowItWorks} />
+            {/* The landing sets its own vertical rhythm; the other pages keep theirs. */}
+            <main className={cn('mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6', !home && 'pb-20 pt-10 lg:pt-14')}>
+              {home ? <LandingPage onOpenHowItWorks={openHowItWorks} /> : null}
+              {/* Estimasi stays mounted so its form and result survive a visit to another page. */}
+              <div hidden={route.page !== 'estimasi'}>
+                <EstimatePage />
+              </div>
+              {route.page === 'kasus' ? <CasesPage caseId={route.caseId} /> : null}
+            </main>
+            {home ? (
+              <LandingFooter />
+            ) : (
+              <footer className="border-t border-rule">
+                <p className="mx-auto max-w-6xl px-4 py-6 text-[13px] text-ink-subtle sm:px-6">{copy.app.footer}</p>
+              </footer>
+            )}
+            <HowItWorks open={howItWorksOpen} onOpenChange={setHowItWorksOpen} />
+          </div>
+        </TooltipProvider>
+      </VocabularyProvider>
     </IndexStatusProvider>
   );
 }

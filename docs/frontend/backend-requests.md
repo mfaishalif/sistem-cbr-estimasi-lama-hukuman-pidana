@@ -1,172 +1,222 @@
 # Permintaan frontend ke backend
 
-Daftar data dan perubahan yang dibutuhkan UI tetapi belum tersedia di API.
-Frontend sekarang tetap berfungsi tanpanya; setiap butir menyebut solusi
-sementara yang dipakai. Tidak ada yang diimplementasikan di backend sebagai
-bagian dari redesain.
+Dokumen ini mencatat kontrak data yang dibutuhkan UI, keputusan yang sudah
+diimplementasikan, dan angka hasil impor ulang snapshot Indo-Law. Semua angka
+diukur pada basis kasus `data/backend-requests/app.db` hasil impor snapshot
+`67340338` dan konfigurasi `config/retrieval.json` dengan fingerprint
+`bd4fadb2b7402393`.
 
-Angka di dokumen ini diukur pada basis kasus Indo-Law hasil impor snapshot
-`67340338` (5.782 perkara, 5.773 kelompok, generasi 31.407) dan konfigurasi
-aplikasi dengan fingerprint `6a3700e4f7e7e823`.
+## Ringkasan status
 
-## Ringkasan prioritas
-
-| # | Permintaan | Prioritas | Ukuran kerja |
+| # | Permintaan | Status | Bukti |
 | --- | --- | --- | --- |
-| 1 | Selaraskan `config/retrieval.json` dengan konfigurasi evaluasi terkunci | **Tinggi** | Kecil (satu file JSON), perlu keputusan tim |
-| 2 | Normalisasi nilai `education` dan `occupation` saat impor | Sedang | Sedang (importer + impor ulang) |
-| 3 | `GET /api/cases`: filter `category=`, opsi tanpa kategori, `narrationPreview` | Sedang | Kecil–sedang |
-| 4 | `GET /api/vocabulary` | Rendah | Kecil |
+| 1 | Selaraskan `config/retrieval.json` dengan konfigurasi evaluasi terkunci | Selesai | Fingerprint `bd4fadb2b7402393` |
+| 2 | Normalisasi nilai `education` dan `occupation` saat impor | Selesai | 120 dan 184 nilai dibuang; 304→280 dan 764→741 nilai unik |
+| 3 | `GET /api/cases`: filter `category=`, tanpa kategori, `narrationPreview` | Selesai | `q=tegal&category=pencurian` = 16; `category=__none__` = 1.335 |
+| 4 | `GET /api/vocabulary` | Selesai | 20 kategori, 1.335 tanpa kategori, top-20 atribut |
 
-Bila hanya satu yang bisa dikerjakan, kerjakan nomor 1: itu menyangkut
-kebenaran angka yang ditampilkan, bukan kenyamanan tampilan.
+Snapshot resmi diverifikasi ulang dengan alat yang ada:
 
----
+- commit `67340338adbc63021630947d905627eef0d7e43f`
+- arsip `indo-law-67340338adbc63021630947d905627eef0d7e43f.zip`
+- SHA-256 arsip `d033322c4086bfc3d688a8fef4f79a2dd912789a3db95874876d4f169847d124`
+- 22.630 berkas XML, 1.230.556.735 byte
 
-## 1. Selaraskan `config/retrieval.json` dengan konfigurasi evaluasi terkunci
-
-**Masalah.** Drawer "Cara kerja" menampilkan hasil uji (cakupan 98,62%, MAE
-371,7 hari dibanding median per kategori 394,2 hari pada 867 perkara uji).
-Angka itu berasal dari `kandidat-15`. Aplikasi yang berjalan masih memakai
-konfigurasi placeholder:
-
-| Parameter | Aplikasi sekarang | `kandidat-15` (terkunci) |
-| --- | --- | --- |
-| Bobot kronologi / pasal / atribut | 1 / 0,5 / 0,1–0,2 per atribut | 0,75 / 0,20 / 0,05 (`attributeGroupWeight`) |
-| `maxReferences` | 5 | 5 |
-| `minReferences` | 1 | 2 |
-| `minScore` | 0 | 0,10 |
-| `minAttributeCoverage` | 0 | 0,85 |
-
-Akibatnya angka evaluasi tidak menggambarkan estimasi yang dilihat pengguna,
-dan hal ini mudah dipertanyakan saat presentasi. Dengan `minReferences` 1,
-estimasi juga keluar dari satu putusan saja; status "Estimasi belum tersedia"
-karena putusan terlalu sedikit (`REFERENSI_TIDAK_CUKUP`) praktis tidak pernah
-muncul.
-
-**Data pendukung.** Pada contoh kronologi pencurian sepeda motor, lima
-putusan teratas bersekor 0,15–0,19, jadi tetap lolos `minScore` 0,10. Kategori
-kecil seperti kehutanan (4 perkara), senjata api (5), dan mata uang (6) adalah
-yang paling mungkin berubah menjadi "belum tersedia" setelah penyelarasan.
-Hal itu memang perilaku yang diharapkan, dan UI sudah punya state serta saran
-tindakannya.
-
-**Permintaan.** Ganti isi `config/retrieval.json` dengan konfigurasi
-terkunci, lalu pastikan fingerprint di `GET /api/config` sama dengan
-fingerprint di artefak evaluasi.
-
-**Setelah selesai, frontend akan** mengganti catatan di "Cara kerja" menjadi
-pernyataan bahwa aplikasi memakai konfigurasi yang sama dengan evaluasi.
-
-**Sementara:** "Cara kerja" menyebut bahwa angka evaluasi berasal dari
-konfigurasi terkunci, sedangkan aplikasi memakai `config/retrieval.json`
-beserta fingerprint-nya.
+Hasil impor: **5.782 unit perkara**, **5.773 kelompok perkara**, **1.335 unit
+tanpa kategori**. Laporan impor mencatat generasi **31.102**; setelah API
+menyimpan konfigurasi, generasi basis kasus menjadi **31.103**.
 
 ---
 
-## 2. Normalisasi `education` dan `occupation` saat impor
+## 1. Konfigurasi retrieval
 
-**Masalah.** Kedua atribut dibandingkan secara kategoris (sama persis = 1,
-berbeda = 0). Nilai hasil ekstraksi sangat beragam dan sebagian salah:
+`config/retrieval.json` sekarang berisi konfigurasi `kandidat-15` yang dikunci
+pada evaluasi:
 
-| Atribut | Tercatat | Nilai unik | Nilai teratas |
-| --- | ---: | ---: | --- |
-| `education` | 1.124 perkara | 304 | sma 131, sd 106, **terdakwa 104**, smp 91, slta 39, sd tamat 36, sd tidak tamat 34, smp tamat 32 |
-| `occupation` | 4.240 perkara | 764 | swasta 1.065, wiraswasta 583, buruh 279, karyawan swasta 224, **terdakwa 147**, tani 139, petani 82, tidak bekerja 68 |
+| Parameter | Nilai |
+| --- | --- |
+| Bobot kronologi / pasal / kelompok atribut | 0,75 / 0,20 / 0,05 |
+| `maxReferences` | 5 |
+| `minReferences` | 2 |
+| `minScore` | 0,10 |
+| `minAttributeCoverage` | 0,85 |
+| `minTokenLength` | 1 |
+| `minDocumentFrequency` | 2 |
+| `sublinearTermFrequency` | `false` |
+| `smoothInverseDocumentFrequency` | `true` |
 
-- "terdakwa" (104 dan 147 perkara) jelas bukan pendidikan atau pekerjaan;
-  ekstraksi tampaknya mengambil kata setelah label yang kosong.
-- Varian yang maknanya sama dianggap berbeda: sma / slta / sma tamat,
-  tani / petani, swasta / karyawan swasta.
+`GET /api/config` mengembalikan fingerprint `bd4fadb2b7402393`, sama dengan
+fingerprint artefak evaluasi. Drawer "Cara kerja" hanya menyatakan konfigurasi
+aplikasi sama dengan evaluasi bila fingerprint itu cocok; bila berbeda, ia
+tetap menyebut bahwa hasil aplikasi dapat berbeda.
 
-Akibatnya pengguna yang mengisi "SMA" tidak cocok dengan putusan bertulis
-"slta", dan perkara bertulis "terdakwa" saling cocok satu sama lain tanpa
-arti.
+Catatan penting untuk UI: cakupan 98,62% dan MAE 371,7 hari adalah **hasil uji
+historis sebelum normalisasi atribut**. Angka itu tidak dihitung ulang pada
+basis kasus yang sudah dinormalisasi.
 
-**Permintaan.**
-- Buang nilai yang jelas bukan isian (misalnya "terdakwa", "-", kosong) saat
-  impor, sehingga atribut itu tidak ditulis (tidak diketahui).
-- Petakan varian ke nilai kanonis, misalnya pendidikan: `tidak-sekolah`,
-  `sd`, `smp`, `sma`, `diploma`, `sarjana`, `pascasarjana`; status tamat/tidak
-  tamat boleh disimpan terpisah bila perlu.
-- Impor ulang, lalu laporkan perubahan jumlah nilai unik di laporan impor.
+## 2. Normalisasi `education` dan `occupation`
 
-**Setelah selesai, frontend akan** mengganti input teks bebas pendidikan dan
-pekerjaan dengan pilihan dari daftar kanonis (lihat nomor 4).
+Satu aturan dipakai oleh importer, penulisan lewat API, dan pembandingan nilai
+lama:
 
-**Sementara:** input teks bebas, di-lowercase sebelum dikirim.
+- rapikan huruf besar/kecil, spasi, dan tanda baca di tepi;
+- buang nilai kosong, hanya tanda hubung, `terdakwa`, dan penanda tidak
+  diketahui (`tidak diketahui`, `n/a`, `null`, dan sejenisnya);
+- petakan alias pendidikan ke `tidak-sekolah`, `sd`, `smp`, `sma`, `diploma`,
+  `sarjana`, atau `pascasarjana`;
+- petakan `tani` → `petani` dan `karyawan swasta` → `swasta`;
+- pertahankan nilai bermakna di luar alias, misalnya `sd tidak tamat`,
+  `buruh harian`, dan `tidak bekerja`;
+- lokasi bukti (`sourceLocation`) tetap tersimpan.
 
-**Catatan terkait.** Dua atribut lain hampir tidak pernah tercatat: `role` (26
-perkara) dan `victim_count` (1 perkara). Field-nya tetap ada di UI, tetapi
-pengguna perlu tahu bahwa isian itu hampir tidak memengaruhi kemiripan. Bila
-ekstraksi tidak akan diperbaiki, beri tahu frontend agar field tersebut bisa
-disembunyikan.
+Normalisasi terjadi sebelum nilai ditulis, sehingga nilai yang dibuang tidak
+membuat baris atribut. Perbandingan CBR memakai fungsi yang sama, jadi data
+lama dan data baru bertemu pada bentuk kanonis yang sama.
 
----
+### Hasil impor ulang
 
-## 3. `GET /api/cases`: filter kategori eksak, tanpa kategori, dan `narrationPreview`
+| Atribut | Tercatat sebelum | Tercatat sesudah | Nilai unik sebelum | Nilai unik sesudah | Dibuang |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `education` | 1.124 | 1.004 | 304 | 280 | 120 |
+| `occupation` | 4.240 | 4.056 | 764 | 741 | 184 |
 
-**Masalah.** Filter kategori di Basis kasus menumpang `q=<slug>`. Pada data
-saat ini jumlahnya sudah tepat (misalnya pencurian 1.639, penipuan 811,
-senjata api 5), tetapi ada tiga kekurangan:
+Nilai teratas sesudah normalisasi:
 
-- Kategori dan kata pencarian tidak bisa digabung, karena keduanya memakai
-  `q`. UI membuat keduanya saling meniadakan.
-- **1.335 perkara (23%) tidak berkategori** dan tidak bisa difilter sama
-  sekali.
-- Tabel tidak bisa menampilkan potongan kronologi, padahal banyak nomor
-  perkara dari pengadilan yang sama mirip satu sama lain.
+- `education`: `sma` 208, `sd` 146, `smp` 138, `sd tidak tamat` 34, `smk` 31,
+  `stm` 22, `smp tidak tamat` 17, `sarjana` 14.
+- `occupation`: `swasta` 1.290, `wiraswasta` 583, `buruh` 279, `petani` 221,
+  `tidak bekerja` 68, `buruh harian lepas` 60, `sopir` 60.
 
-**Usulan:**
+Laporan impor (`artifacts/import/backend-requests.json`) memuat, untuk setiap
+atribut, `present`, `total`, `uniqueValuesBefore`, `uniqueValuesAfter`, dan
+`discarded`, dihitung pada unit perkara yang sudah dideduplikasi.
+
+`role` (26 perkara) dan `victim_count` (1 perkara) tetap tersedia di UI, tetapi
+keduanya diberi catatan singkat bahwa isian itu jarang tercatat di Indo-Law
+dan hampir tidak memengaruhi kemiripan.
+
+## 3. `GET /api/cases`
+
+Parameter:
+
+- `limit` (1–200, default 25), `offset` (≥0), `q` (pencarian teks).
+- `category` dicocokkan **eksak** dan digabung dengan `q` memakai AND.
+- `category=` kosong berarti semua kategori.
+- `category=__none__` berarti `category IS NULL`.
+
+`items` dan `total` memakai predikat yang sama, sehingga jumlah halaman tidak
+berbeda dari daftar.
+
+Contoh terukur:
 
 ```http
-GET /api/cases?limit=20&offset=0&q=tegal&category=pencurian
-GET /api/cases?category=__none__
+GET /api/cases?q=tegal&category=pencurian&limit=20&offset=0
 ```
 
-- `category` dicocokkan eksak dan digabung dengan `q` (AND).
-- Nilai khusus (misalnya `__none__`) untuk perkara tanpa kategori.
-- Setiap item `CaseUnitSummary` ditambah `narrationPreview: string | null`
-  (±160 karakter pertama kronologi, dipotong di batas kata).
+mengembalikan `total: 16`. `GET /api/cases?category=__none__` mengembalikan
+`total: 1335`.
 
-**Sementara:** `q = search || category` (lihat komentar di
-`apps/web/src/pages/cases/CasesPage.tsx`); tidak ada filter "Tanpa kategori";
-tabel tanpa potongan kronologi.
+Setiap `CaseUnitSummary` sekarang memiliki:
 
----
+```ts
+narrationPreview: string | null;
+```
+
+Nilainya adalah kronologi dengan spasi dirapikan, dipotong paling banyak 160
+karakter **termasuk elipsis**, dan dipotong di batas kata bila memungkinkan.
+Kronologi kosong menghasilkan `null`.
+
+Frontend memakai parameter `q` dan `category` secara terpisah, mereset halaman
+saat filter berubah, mengabaikan respons lama yang datang terlambat, dan
+menampilkan **Tanpa kategori** beserta jumlah perkara di dropdown. Potongan
+kronologi tampil di tabel desktop dan daftar ponsel.
 
 ## 4. `GET /api/vocabulary`
 
-**Masalah.** Daftar 20 kategori di `apps/web/src/lib/vocabulary.ts` ditulis
-tangan. Untuk snapshot ini daftarnya benar, tetapi akan basi tanpa ketahuan
-bila dataset diganti. Jumlah perkara per kategori juga membantu pengguna
-memahami kenapa kategori kecil sering membuat estimasi belum tersedia.
-
-**Bentuk respons usulan** (angka dari data saat ini):
+Respons aktual:
 
 ```json
 {
-  "generation": 31407,
+  "generation": 31103,
   "categories": [
     { "value": "pencurian", "caseCount": 1639 },
     { "value": "penggelapan", "caseCount": 886 },
-    { "value": "kehutanan", "caseCount": 4 },
-    { "value": "kejahatan-terhadap-kemerdekaan-orang-lain", "caseCount": 2 }
+    { "value": "penipuan", "caseCount": 811 }
   ],
   "uncategorizedCount": 1335,
   "attributes": {
-    "education": [{ "value": "sma", "caseCount": 131 }],
-    "occupation": [{ "value": "swasta", "caseCount": 1065 }]
+    "education": [{ "value": "sma", "caseCount": 208 }],
+    "occupation": [{ "value": "swasta", "caseCount": 1290 }]
   },
   "limit": 20
 }
 ```
 
-`attributes.*` cukup top-N, diurutkan dari yang terbanyak, dan paling berguna
-setelah nomor 2 selesai. Label tampilan tetap diatur frontend; slug dikirim
-apa adanya.
+- Kategori dikembalikan semua, diurutkan jumlah terbanyak lalu nilai naik.
+- `education` dan `occupation` dibatasi maksimal 20 nilai; `limit` selalu 20.
+- Seluruh respons dibaca dalam satu transaksi baca, sehingga `generation` dan
+  hitungan berasal dari snapshot basis kasus yang sama.
+- Slug dikirim apa adanya; label tampilan tetap diatur frontend.
 
-**Setelah selesai, frontend akan** menampilkan jumlah perkara di dropdown
-kategori dan memakai daftar ini untuk saran pendidikan/pekerjaan.
+Frontend memakai satu provider kosakata untuk Basis kasus, Estimasi, dan
+editor. Provider mendengarkan perubahan generasi basis kasus dan memuat ulang
+setelah penyimpanan, sehingga jumlah kategori ikut berubah tanpa reload.
+Kategori di form Estimasi berupa pilihan dari API; editor menerima kategori
+baru lewat input dengan saran. Pendidikan memakai pilihan kanonis, sedangkan
+pekerjaan memakai saran top-20 yang tetap menerima nilai di luar daftar. Nilai
+lama yang tidak ada di daftar tetap ditampilkan saat mengedit.
 
-**Sementara:** daftar hardcode dengan komentar `TEMPORARY`.
+---
+
+## Menjalankan basis kasus terpisah
+
+Aplikasi Docker tetap memakai port `3000` dan basis kasusnya sendiri. Untuk
+memeriksa snapshot resmi tanpa mengubah data Docker, jalankan instance kedua:
+
+```powershell
+npm run build
+$env:PORT = '3001'
+$env:DATABASE_PATH = 'data/backend-requests/app.db'
+$env:WEB_DIST_DIR = 'apps/web/dist'
+node apps/api/dist/main.js
+```
+
+Buka `http://localhost:3001`. Saat start, API memuat
+`config/retrieval.json`, menyimpannya ke basis data bila fingerprint berubah,
+lalu membangun indeks dari basis kasus tersebut.
+
+Untuk uji tulis (tambah/ubah perkara), salin basis kasus resmi lebih dulu agar
+snapshot tidak berubah:
+
+```powershell
+Copy-Item data/backend-requests/app.db $env:TEMP\cbr-write\app.db -Force
+$env:PORT = '3002'
+$env:DATABASE_PATH = "$env:TEMP\cbr-write\app.db"
+node apps/api/dist/main.js
+```
+
+Impor ulang dari snapshot resmi:
+
+```powershell
+node tools/importer/dist/acquire-cli.js `
+  --destination C:\Users\faishal\Documents\cbr-indo-law-snapshot\snapshot `
+  --archive C:\Users\faishal\Documents\cbr-indo-law-snapshot\indo-law-67340338adbc63021630947d905627eef0d7e43f.zip
+
+node tools/cli/dist/index.js import `
+  --source C:\Users\faishal\Documents\cbr-indo-law-snapshot\snapshot `
+  --database data/backend-requests/app.db `
+  --report artifacts/import/backend-requests.json
+```
+
+## Verifikasi
+
+- `npm test` — 254 tes lulus (baseline 238).
+- `npm run lint` — tanpa peringatan.
+- `npm run build` — paket, web, dan API berhasil dibangun.
+- Pemeriksaan API pada port `3001`: 5.782 unit, 5.773 kelompok, 1.335 tanpa
+  kategori, fingerprint `bd4fadb2b7402393`.
+- Dengan hanya satu referensi yang lolos, estimasi ditahan dengan kode
+  `REFERENSI_TIDAK_CUKUP`.
+- Pemeriksaan Playwright: filter gabungan, paginasi, pratinjau desktop dan
+  ponsel, pilihan form, penyegaran kosakata setelah simpan, dan catatan
+  fingerprint di "Cara kerja".
