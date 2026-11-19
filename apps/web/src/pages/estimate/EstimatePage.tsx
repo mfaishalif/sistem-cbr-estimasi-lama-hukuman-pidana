@@ -46,7 +46,7 @@ export function EstimatePage() {
   return (
     <div className="space-y-10 lg:space-y-14">
       <header className="mx-auto max-w-3xl space-y-3 text-center">
-        <h1 className="text-balance font-serif text-[32px] font-semibold leading-tight text-ink sm:text-[40px]">{copy.estimate.title}</h1>
+        <h1 className="text-balance font-heading text-[32px] font-semibold leading-tight text-ink sm:text-[40px]">{copy.estimate.title}</h1>
         <p className="text-balance text-[17px] text-ink-muted">{copy.estimate.intro}</p>
       </header>
 

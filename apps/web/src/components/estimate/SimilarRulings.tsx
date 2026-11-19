@@ -31,7 +31,7 @@ export function SimilarRulings({ title, references, narration, activeRank, onAct
   return (
     <section aria-labelledby="similar-rulings-title" className="space-y-6">
       <div className="space-y-1">
-        <h3 id="similar-rulings-title" className="font-serif text-xl font-semibold text-ink">
+        <h3 id="similar-rulings-title" className="font-heading text-xl font-semibold text-ink">
           {title}
         </h3>
         <p className="text-[13px] text-ink-subtle">{copy.result.similarityNote}</p>

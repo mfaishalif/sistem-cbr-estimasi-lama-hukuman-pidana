@@ -31,7 +31,7 @@ export function WithheldState({ result, narration, onRetry, onSearchAllCategorie
   return (
     <div className="space-y-12">
       <div className="border-l-4 border-caution pl-5">
-        <h2 className="flex items-center gap-2 font-serif text-2xl font-semibold text-caution">
+        <h2 className="flex items-center gap-2 font-heading text-2xl font-semibold text-caution">
           <AlertTriangle className="size-5 shrink-0" aria-hidden />
           {copy.result.withheldTitle}
         </h2>

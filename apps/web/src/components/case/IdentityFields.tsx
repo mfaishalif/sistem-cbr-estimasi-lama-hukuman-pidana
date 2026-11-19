@@ -1,8 +1,10 @@
 import { errorFor } from '@/components/ui/error-summary';
 import { Field, describedBy } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { Hint } from '@/components/ui/label';
 import type { FieldError, IdentityInput } from '@/lib/case-form';
 import { copy } from '@/lib/copy';
+import { FORM_GRID, SECTION_BODY, SECTION_HEADING, span } from './layout';
 
 interface IdentityFieldsProps {
   idPrefix: string;
@@ -18,7 +20,7 @@ export function IdentityFields({ idPrefix, value, onChange, errors, disabled }: 
     const id = `${idPrefix}-${errorKey}`;
     const error = errorFor(errors, errorKey);
     return (
-      <Field id={id} label={label} error={error}>
+      <Field id={id} label={label} error={error} className={key === 'defendantName' ? `${span.half} col-start-1` : span.half}>
         <Input
           id={id}
           value={value[key]}
@@ -28,6 +30,7 @@ export function IdentityFields({ idPrefix, value, onChange, errors, disabled }: 
           aria-describedby={[describedBy(id, { error }), `${idPrefix}-identity-hint`].filter(Boolean).join(' ')}
           aria-required={required || undefined}
           className={key === 'caseNumber' ? 'tabular' : undefined}
+          autoComplete="off"
           disabled={disabled}
         />
       </Field>
@@ -35,14 +38,12 @@ export function IdentityFields({ idPrefix, value, onChange, errors, disabled }: 
   };
 
   return (
-    <fieldset className="space-y-4">
-      <legend className="text-[15px] font-semibold text-ink">
-        {copy.identity.title}
-      </legend>
-      <p id={`${idPrefix}-identity-hint`} className="text-sm text-ink-subtle">
+    <fieldset className="@container">
+      <legend className={SECTION_HEADING}>{copy.identity.title}</legend>
+      <Hint id={`${idPrefix}-identity-hint`} className="mt-1.5">
         {copy.identity.hint}
-      </p>
-      <div className="grid gap-4 sm:grid-cols-2">
+      </Hint>
+      <div className={`${SECTION_BODY} ${FORM_GRID}`}>
         {field('court', 'court', copy.actual.courtLabel, true)}
         {field('caseNumber', 'case-number', copy.actual.caseNumberLabel, true)}
         {field('defendantName', 'defendant', copy.actual.defendantLabel, false)}

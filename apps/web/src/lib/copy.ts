@@ -12,6 +12,49 @@ export const copy = {
     howItWorks: 'Cara kerja',
     footer: 'Estimasi menggambarkan pola putusan terdahulu, bukan penentuan hukuman.',
   },
+  // Landing (#beranda): plain language only; technical detail stays in "Cara kerja".
+  landing: {
+    eyebrow: 'Sistem berbasis kasus · Putusan pidana Indonesia',
+    title: 'Lihat bagaimana perkara serupa pernah diputus',
+    intro:
+      'Tuliskan kronologi perkara. Sistem mencari putusan pengadilan yang paling mirip dan menampilkan rentang lama penjara yang pernah dijatuhkan.',
+    start: 'Mulai estimasi',
+    explore: 'Jelajahi basis kasus',
+    illustrationLabel: 'Estimasi ± 1 tahun 7 bulan',
+    illustrationCaption: 'Contoh tampilan hasil',
+    illustrationAlt:
+      'Contoh grafik: lima titik putusan serupa pada satu garis, satu di antaranya paling mirip, dengan penanda estimasi sekitar 1 tahun 7 bulan.',
+    stepsTitle: 'Tiga langkah',
+    steps: [
+      {
+        title: 'Tulis kronologi',
+        body: 'Salin atau tulis kronologi perkara. Pasal dan identitas terdakwa boleh dikosongkan.',
+      },
+      {
+        title: 'Temukan putusan serupa',
+        body: 'Sistem membandingkan kronologi Anda dengan putusan yang sudah ada di basis kasus.',
+      },
+      {
+        title: 'Pahami rentangnya',
+        body: 'Lihat lama penjara pada putusan-putusan tersebut beserta alasan kemiripannya.',
+      },
+    ],
+    caseBaseTitle: 'Basis kasus',
+    caseBaseBefore: 'Dibangun dari',
+    caseBaseAfter: 'putusan pidana tingkat pertama dari dataset Indo-Law.',
+    caseBaseWithoutCount: 'Dibangun dari putusan pidana tingkat pertama dari dataset Indo-Law.',
+    caseBaseLink: 'Lihat basis kasus',
+    limitsTitle: 'Yang perlu diingat',
+    limits: [
+      'Estimasi menggambarkan pola putusan terdahulu, bukan penentuan hukuman.',
+      'Sistem tidak menilai bersalah atau tidak bersalahnya terdakwa.',
+      'Setiap perkara tetap bergantung pada fakta persidangan dan pertimbangan hakim.',
+    ],
+    howItWorksLink: 'Baca cara kerja sistem',
+    footerProject: 'Proyek mata kuliah Sistem Berbasis Pengetahuan · Universitas Airlangga',
+    footerData: 'Data: Indo-Law',
+    datasetUrl: 'https://github.com/ir-nlp-csui/indo-law',
+  },
   index: {
     ready: 'Indeks siap',
     building: 'Menyiapkan indeks…',
@@ -58,8 +101,6 @@ export const copy = {
     retry: 'Coba lagi',
     withheldTitle: 'Estimasi belum tersedia',
     rangeTitle: 'Rentang hukuman pada putusan serupa',
-    rangeLegend:
-      '● angka = peringkat putusan serupa · ukuran titik = pengaruh terhadap estimasi · garis marun = estimasi',
     similarTitle: 'Putusan serupa',
     similarFoundTitle: 'Putusan yang ditemukan',
     similarityLabel: 'Tingkat kemiripan',

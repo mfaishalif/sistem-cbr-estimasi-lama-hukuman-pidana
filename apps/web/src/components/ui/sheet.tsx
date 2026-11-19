@@ -29,7 +29,7 @@ export function Sheet({ open, onOpenChange, title, description, wide = false, ch
         >
           <div className="flex items-start justify-between gap-4 px-4 pb-4 pt-6 sm:px-8">
             <div className="min-w-0">
-              <DialogPrimitive.Title className="font-serif text-2xl font-semibold text-ink">{title}</DialogPrimitive.Title>
+              <DialogPrimitive.Title className="font-heading text-2xl font-semibold text-ink">{title}</DialogPrimitive.Title>
               {description === undefined ? null : (
                 <DialogPrimitive.Description className="mt-1 text-sm text-ink-subtle">{description}</DialogPrimitive.Description>
               )}

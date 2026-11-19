@@ -38,7 +38,7 @@ export function ActualRuling({ estimateDays, facts, stale, onActualChange }: Act
   return (
     <section aria-labelledby="actual-title" className="space-y-5 border-t border-rule pt-8">
       <div className="space-y-1">
-        <h3 id="actual-title" className="font-serif text-xl font-semibold text-ink">
+        <h3 id="actual-title" className="font-heading text-xl font-semibold text-ink">
           {copy.actual.title}
         </h3>
         <p className="text-[15px] text-ink-muted">{copy.actual.note}</p>

@@ -1,6 +1,7 @@
 import type { FormEvent, KeyboardEvent } from 'react';
 import { CaseDetailsFields } from '@/components/case/CaseDetailsFields';
 import { CategoryField } from '@/components/case/CategoryField';
+import { FORM_CONTAINER, FORM_GRID, SECTION_GAP } from '@/components/case/layout';
 import { NarrationField } from '@/components/case/NarrationField';
 import type { FieldsProps } from '@/components/case/types';
 import { Button } from '@/components/ui/button';
@@ -35,10 +36,12 @@ export function EstimateForm({ onSubmit, loading, index, ...fields }: EstimateFo
   const note = building ? copy.estimate.buildingReason : index?.status === 'stale' ? copy.estimate.staleNote : null;
 
   return (
-    <form noValidate onSubmit={submit} onKeyDown={onKeyDown} className="space-y-8">
+    <form noValidate autoComplete="off" onSubmit={submit} onKeyDown={onKeyDown} className={`${FORM_CONTAINER} ${SECTION_GAP}`}>
       <ErrorSummary title={copy.estimate.errorSummaryTitle} errors={fields.errors} idPrefix={fields.idPrefix} />
-      <NarrationField {...fields} withSample />
-      <CategoryField {...fields} />
+      <div className={FORM_GRID}>
+        <NarrationField {...fields} withSample />
+        <CategoryField {...fields} />
+      </div>
       <CaseDetailsFields {...fields} />
 
       <div className="space-y-3 border-t border-rule pt-6">
