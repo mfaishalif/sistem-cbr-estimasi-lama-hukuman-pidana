@@ -79,22 +79,26 @@ estimasi sebagai hasil aktual; isi hasil aktual hanya dari putusan yang sudah
 diketahui.
 
 1. Jalankan `docker compose up --build`, lalu buka <http://localhost:3000>.
-   Baca contoh rekaan di **Ringkasan** dan periksa badge indeks.
-2. Buka **Basis kasus** → **Kasus baru**. Tambahkan dua atau tiga kasus sintetis
-   dengan pengadilan, nomor perkara, narasi pra-putusan, kategori yang sama
-   (misalnya `pencurian`), dan hasil aktual yang berbeda (misalnya 240, 360, dan
-   540 hari). Pasal dan atribut boleh dikosongkan.
-3. Buka **Estimasi 4R**, isi narasi serupa dan kategori yang sama, lalu tekan
-   **Jalankan Retrieve**. Buka setiap kartu referensi untuk memeriksa skor,
-   komponen skor, perbandingan atribut, sumber, dan perhitungan Reuse berbobot.
-   Periksa juga angka Reuse dan rentang hasil aktual referensi.
-4. Untuk **Revise**, isi **Hasil aktual (hari penjara)** dari putusan dan tekan
-   **Terapkan Revise**. UI hanya membandingkan hasil aktual dengan estimasi;
-   basis kasus belum berubah.
-5. Untuk **Retain**, tekan **Retain ke basis kasus**. Kasus baru disimpan dengan
-   hasil aktual tersebut, bukan dengan angka estimasi. Indeks lama dibatalkan;
-   estimasi berikutnya membangun indeks dari basis kasus terbaru.
-6. Di **Basis kasus**, coba **Ubah** dan **Hapus**. Perubahan menaikkan generasi
+   Tautan **Cara kerja** di header menjelaskan alur 4R. Bila indeks belum siap,
+   panel hasil menampilkan keterangannya.
+2. Buka **Basis kasus** → **Tambah perkara**. Tambahkan dua atau tiga perkara
+   sintetis dengan pengadilan, nomor perkara, kronologi pra-putusan, kategori
+   yang sama (misalnya Pencurian), dan putusan aktual yang berbeda (misalnya 8
+   bulan, 1 tahun, dan 1 tahun 6 bulan). Detail perkara boleh dikosongkan.
+3. Buka **Estimasi**, isi kronologi serupa dan kategori yang sama, lalu tekan
+   **Hitung estimasi** (atau Ctrl + Enter). Periksa grafik rentang, buka
+   **Lihat alasan kemiripan** pada kartu putusan serupa, dan buka **Rincian
+   perhitungan** untuk rumus Reuse dengan angka nyata.
+4. Untuk **Revise**, isi **Masukkan putusan aktual** dengan lama penjara dari
+   putusan (Tahun/Bulan/Hari). UI menampilkan selisih dan penanda putusan
+   aktual di grafik; basis kasus belum berubah.
+5. Untuk **Retain**, tekan **Simpan ke basis kasus**, isi pengadilan dan nomor
+   perkara, lalu **Simpan putusan**. Perkara disimpan dengan fakta yang sama
+   persis seperti saat estimasi dan dengan putusan aktual, bukan angka estimasi.
+   Indeks lama dibatalkan; estimasi berikutnya membangun indeks dari basis kasus
+   terbaru.
+6. Di **Basis kasus**, buka satu perkara, lalu coba **Ubah perkara**, **Ubah
+   putusan aktual**, dan **Hapus**. Perubahan menaikkan generasi
    basis kasus dan membuat indeks lama tidak dipakai. Kasus yang dihapus tidak
    lagi menjadi referensi setelah indeks dibangun ulang.
 7. Hentikan dan jalankan ulang container tanpa `down -v`; jumlah unit dan hasil
@@ -560,7 +564,7 @@ sebelum `npm start`.
 ## Struktur
 
 ```text
-apps/web        React + Vite + shadcn/ui (token visual dari design.md)
+apps/web        React + Vite + Tailwind; sistem desain dan pedoman bahasa di design.md
 apps/api        NestJS: HTTP /api, menyajikan build frontend
 packages/cbr    Mesin Retrieve–Reuse: model, kontrak, TF-IDF, atribut, indeks, reuse
 packages/data   Akses SQLite, migrasi, repository, adapter snapshot CBR
@@ -582,14 +586,15 @@ dilepas; bila build gagal, estimasi ditahan, bukan diisi dengan hasil basi.
 
 1. `npm ci && npm run typecheck && npm test && npm run build`
 2. `docker compose up --build`, lalu buka `http://localhost:3000` dan
-   `http://localhost:3000/api/health`. Ringkasan menampilkan cara kerja estimasi
-   dengan contoh 4R. Cek fingerprint dan sumber `config/retrieval.json` lewat
+   `http://localhost:3000/api/health`. Drawer **Cara kerja** menjelaskan alur
+   4R dan hasil evaluasi. Cek fingerprint dan sumber `config/retrieval.json` lewat
    `/api/config`, serta status indeks lewat `/api/index/status`.
 3. Migrasi database kosong: hapus volume **hanya untuk pemeriksaan** dengan
    `docker compose down -v`, lalu `docker compose up --build`; status skema
    harus `002`.
-4. Alur 4R: tambahkan 2–3 unit sintetis melalui UI, jalankan Retrieve, dan
-   periksa referensi, skor, perhitungan, serta rentang hasil aktual. Uji narasi
+4. Alur 4R: tambahkan 2–3 perkara sintetis melalui UI, tekan **Hitung
+   estimasi**, dan periksa putusan serupa, tingkat kemiripan, rincian
+   perhitungan, serta grafik rentang. Uji narasi
    kosong (ditolak) dan kategori tanpa kasus (estimasi ditahan dengan alasan).
    Untuk Revise/Retain, gunakan data sintetis atau salinan basis kasus—bukan
    unit dari split evaluasi. Hasil aktual harus berasal dari putusan, bukan dari

@@ -1,18 +1,24 @@
 import * as React from 'react';
+import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { fieldClass } from './input';
 
-function Select({ className, ...props }: React.ComponentProps<'select'>) {
+/** Native select for keyboard and screen-reader behaviour, styled to match fields. */
+function Select({ className, children, ...props }: React.ComponentProps<'select'>) {
   return (
-    <select
-      data-slot="select"
-      className={cn(
-        'flex h-9 w-full rounded-md border border-hairline-strong bg-surface-1 px-3 py-1 text-sm text-ink transition-colors',
-        'focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30',
-        'disabled:cursor-not-allowed disabled:opacity-50',
-        className,
-      )}
-      {...props}
-    />
+    <div className="relative">
+      <select
+        data-slot="select"
+        className={cn(fieldClass, 'h-11 appearance-none pr-10', className)}
+        {...props}
+      >
+        {children}
+      </select>
+      <ChevronDown
+        className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-ink-subtle"
+        aria-hidden
+      />
+    </div>
   );
 }
 
