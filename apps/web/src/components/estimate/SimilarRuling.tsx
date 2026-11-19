@@ -55,7 +55,7 @@ export function SimilarRuling({ id, reference, narration, terms, active, onActiv
       >
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <RankBadge rank={reference.rank} className="self-center" />
-          <h4 id={`${id}-title`} className="font-serif text-xl font-semibold text-ink">
+          <h4 id={`${id}-title`} className="font-heading text-xl font-semibold text-ink">
             <span className="sr-only">Putusan #{reference.rank}, hukuman </span>
             {formatSentence(reference.actualSentenceDays)}
           </h4>

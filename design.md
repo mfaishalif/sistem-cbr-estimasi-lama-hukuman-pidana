@@ -54,18 +54,19 @@ dekoratif.
 
 Dua keluarga saja, keduanya dipaket lokal lewat Fontsource (tanpa CDN):
 
-- **Lora** (`@fontsource-variable/lora`, variable 400–700), dipakai pada
-  weight 600, tracking normal. Hanya untuk heading: judul halaman, judul
-  bagian, angka estimasi, dan angka hukuman di kartu/drawer.
+- **Poppins** (`@fontsource/poppins`, statis; hanya weight 400 dan 600 yang
+  dimuat), dipakai pada weight 600, tracking normal. Hanya untuk heading:
+  judul halaman, judul bagian, angka estimasi, dan angka hukuman di
+  kartu/drawer. Kelas Tailwind-nya `font-heading`.
 - **Inter** (`@fontsource-variable/inter`) untuk body dan semua UI lainnya:
   navigasi, label, form, isi kartu, kronologi, tabel, metadata, tombol, rumus.
 
 | Peran | Ukuran | Keluarga |
 | --- | --- | --- |
-| Angka estimasi (satu-satunya ukuran display) | 52–64px | Lora 600 |
-| Judul halaman | 32–40px | Lora 600 |
-| Judul bagian / drawer | 18–24px | Lora 600 |
-| Hukuman di kartu | 20px | Lora 600 |
+| Angka estimasi (satu-satunya ukuran display) | 52–64px | Poppins 600 |
+| Judul halaman | 32–40px | Poppins 600 |
+| Judul bagian / drawer | 18–24px | Poppins 600 |
+| Hukuman di kartu | 20px | Poppins 600 |
 | Body | 15–16px, line-height 1.55 | Inter |
 | Metadata | minimal 13px | Inter |
 
@@ -73,7 +74,7 @@ Tidak ada font monospace. Nomor perkara, pasal, dan angka tabel memakai Inter
 dengan kelas `.tabular` (`font-variant-numeric: tabular-nums`, fitur `tnum` dan
 `zero`). `--font-mono` sengaja diarahkan ke Inter.
 
-Lora tidak dipakai untuk label, tombol, atau teks isi.
+Poppins tidak dipakai untuk label, tombol, atau teks isi.
 
 ## 3. Ruang, bentuk, garis
 
@@ -118,8 +119,8 @@ Lora tidak dipakai untuk label, tombol, atau teks isi.
   hitam = putusan aktual (muncul setelah diisi).
 - Titik adalah `<button>`: hover/fokus menyorot kartu yang sama, klik menggulir
   ke kartu. Hover/fokus kartu menyorot titiknya.
-- Legenda satu baris, lalu satu kalimat dengan angka nyata tentang cara
-  estimasi ditimbang. `aria-label` grup merangkum rentang; daftar kartu adalah
+- Tanpa legenda; di bawah grafik hanya satu kalimat dengan angka nyata tentang
+  cara estimasi ditimbang. `aria-label` grup merangkum rentang; daftar kartu adalah
   versi teksnya.
 
 ## 5. Bahasa

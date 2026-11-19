@@ -1,5 +1,5 @@
 import { copy } from '@/lib/copy';
-import { ESTIMATE_HREF, caseHref, type Route } from '@/lib/route';
+import { ESTIMATE_HREF, HOME_HREF, caseHref, type Route } from '@/lib/route';
 import { cn } from '@/lib/utils';
 
 interface AppHeaderProps {
@@ -16,7 +16,7 @@ export function AppHeader({ route, onOpenHowItWorks }: AppHeaderProps) {
   return (
     <header className="border-b border-rule">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-8 gap-y-1 px-4 py-3 sm:px-6 lg:h-16 lg:py-0">
-        <a href={ESTIMATE_HREF} className="font-serif text-lg font-semibold text-ink">
+        <a href={HOME_HREF} className="rounded-sm font-heading text-lg font-semibold text-ink">
           {copy.app.wordmark}
         </a>
         <nav aria-label="Navigasi utama" className="order-3 flex w-full gap-6 sm:order-none sm:w-auto">

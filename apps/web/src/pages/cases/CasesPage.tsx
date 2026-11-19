@@ -68,7 +68,7 @@ export function CasesPage({ caseId }: { caseId: string | null }) {
     <div className="space-y-10">
       <header className="flex flex-wrap items-end justify-between gap-6">
         <div className="space-y-2">
-          <h1 className="font-serif text-[32px] font-semibold leading-tight text-ink sm:text-[40px]">{copy.cases.title}</h1>
+          <h1 className="font-heading text-[32px] font-semibold leading-tight text-ink sm:text-[40px]">{copy.cases.title}</h1>
           <p className="text-[17px] text-ink-muted">
             {baseTotal === null ? ' ' : `${formatInteger(baseTotal)} perkara beserta putusannya.`}
           </p>

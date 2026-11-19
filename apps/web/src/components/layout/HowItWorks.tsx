@@ -53,7 +53,7 @@ export function HowItWorks({ open, onOpenChange }: { open: boolean; onOpenChange
         <ol className="space-y-6">
           {steps.map((step, index) => (
             <li key={step.term} className="grid grid-cols-[2rem_1fr] gap-x-2">
-              <span className="font-serif text-lg font-semibold text-accent" aria-hidden>
+              <span className="font-heading text-lg font-semibold text-accent" aria-hidden>
                 {index + 1}
               </span>
               <div>
@@ -67,7 +67,7 @@ export function HowItWorks({ open, onOpenChange }: { open: boolean; onOpenChange
         </ol>
 
         <section className="space-y-4">
-          <h3 className="font-serif text-xl font-semibold text-ink">Rumus</h3>
+          <h3 className="font-heading text-xl font-semibold text-ink">Rumus</h3>
           <div className="space-y-2">
             <p className="text-[15px] text-ink-muted">Tingkat kemiripan satu putusan:</p>
             <Formula>skor = Σ(bobot × kemiripan) ÷ Σ(bobot komponen yang dapat dibandingkan)</Formula>
@@ -87,7 +87,7 @@ export function HowItWorks({ open, onOpenChange }: { open: boolean; onOpenChange
         </section>
 
         <section className="space-y-4">
-          <h3 className="font-serif text-xl font-semibold text-ink">Hasil evaluasi</h3>
+          <h3 className="font-heading text-xl font-semibold text-ink">Hasil evaluasi</h3>
           <p className="text-[15px] text-ink-muted">
             Basis kasus Indo-Law (5.782 perkara) dibagi 70% latih, 15% validasi, dan 15% uji per kelompok perkara.
             Bobot dan ambang dipilih pada data validasi, lalu diukur sekali pada data uji.
@@ -96,7 +96,7 @@ export function HowItWorks({ open, onOpenChange }: { open: boolean; onOpenChange
             {evaluation.map((item) => (
               <div key={item.label}>
                 <dt className="text-sm text-ink-subtle">{item.label}</dt>
-                <dd className="tabular mt-0.5 font-serif text-2xl font-semibold text-ink">{item.value}</dd>
+                <dd className="tabular mt-0.5 font-heading text-2xl font-semibold text-ink">{item.value}</dd>
                 {item.note === undefined ? null : <dd className="text-[13px] text-ink-subtle">{item.note}</dd>}
               </div>
             ))}

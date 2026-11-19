@@ -36,7 +36,7 @@ export function ResultSuccess({ result, facts, stale }: ResultSuccessProps) {
     <div className="space-y-12">
       <div>
         <p className="text-sm font-medium text-ink-subtle">{copy.result.label}</p>
-        <p className="mt-1 font-serif text-[52px] font-semibold leading-none text-ink sm:text-[64px]">
+        <p className="mt-1 font-heading text-[52px] font-semibold leading-none text-ink sm:text-[64px]">
           {formatSentenceApprox(days)}
         </p>
         <p className="tabular mt-4 text-[15px] text-ink-muted">{resultMeta(result)}</p>

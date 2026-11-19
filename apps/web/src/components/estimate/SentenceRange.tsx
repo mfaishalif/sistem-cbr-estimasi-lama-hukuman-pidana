@@ -157,7 +157,6 @@ export function SentenceRange({ references, estimateDays, actualDays, activeRank
         </div>
       </div>
 
-      <p className="text-[13px] text-ink-subtle">{copy.result.rangeLegend}</p>
       {explanation === null ? null : <p className="text-[15px] text-ink-muted">{explanation}</p>}
     </figure>
   );

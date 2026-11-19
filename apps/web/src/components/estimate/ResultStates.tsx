@@ -28,7 +28,7 @@ function RangeSketch() {
 export function EmptyState() {
   return (
     <div>
-      <h2 className="font-serif text-2xl font-semibold text-ink">{copy.result.emptyTitle}</h2>
+      <h2 className="font-heading text-2xl font-semibold text-ink">{copy.result.emptyTitle}</h2>
       <p className="mt-2 max-w-prose text-[15px] text-ink-muted">{copy.result.emptyBody}</p>
       <RangeSketch />
     </div>
@@ -62,7 +62,7 @@ export function LoadingState({ building }: { building: boolean }) {
 export function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <div role="alert">
-      <h2 className="font-serif text-2xl font-semibold text-ink">{copy.result.errorTitle}</h2>
+      <h2 className="font-heading text-2xl font-semibold text-ink">{copy.result.errorTitle}</h2>
       <p className="mt-2 text-[15px] text-ink-muted">{message}</p>
       <p className="mt-1 text-sm text-ink-subtle">Periksa koneksi ke server aplikasi, lalu coba lagi.</p>
       <Button className="mt-6" onClick={onRetry}>

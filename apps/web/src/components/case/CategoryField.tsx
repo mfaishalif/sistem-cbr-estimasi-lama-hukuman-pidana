@@ -2,13 +2,14 @@ import { Field } from '@/components/ui/field';
 import { Select } from '@/components/ui/select';
 import { copy } from '@/lib/copy';
 import { CATEGORIES, categoryLabel } from '@/lib/vocabulary';
+import { span } from './layout';
 import type { FieldsProps } from './types';
 
 export function CategoryField({ idPrefix, form, patch, disabled, unknownLabel = copy.estimate.categoryUnknown }: FieldsProps & { unknownLabel?: string }) {
   const id = `${idPrefix}-category`;
   const known = form.category === '' || CATEGORIES.some((option) => option.value === form.category);
   return (
-    <Field id={id} label={copy.estimate.categoryLabel}>
+    <Field id={id} label={copy.estimate.categoryLabel} className={span.select}>
       <Select id={id} value={form.category} onChange={(event) => patch({ category: event.target.value })} disabled={disabled}>
         <option value="">{unknownLabel}</option>
         {CATEGORIES.map((option) => (

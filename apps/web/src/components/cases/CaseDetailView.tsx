@@ -11,7 +11,7 @@ import { OutcomeEditor } from './OutcomeEditor';
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="space-y-3">
-      <h3 className="font-serif text-lg font-semibold text-ink">{title}</h3>
+      <h3 className="font-heading text-lg font-semibold text-ink">{title}</h3>
       {children}
     </section>
   );
@@ -115,7 +115,7 @@ export function CaseDetailView({ unit, onUnitChange }: { unit: CaseUnit; onUnitC
             {days === null ? (
               <p className="text-[15px] text-ink-subtle">{copy.cases.noOutcome}</p>
             ) : (
-              <p className="font-serif text-3xl font-semibold text-ink">
+              <p className="font-heading text-3xl font-semibold text-ink">
                 {formatSentence(days)}
                 <span className="tabular ml-3 font-sans text-sm font-normal text-ink-subtle">{formatDayCount(days)}</span>
               </p>

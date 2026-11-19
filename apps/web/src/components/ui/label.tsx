@@ -8,7 +8,7 @@ function Label({ className, ...props }: React.ComponentProps<'label'>) {
 }
 
 function Hint({ className, ...props }: React.ComponentProps<'p'>) {
-  return <p className={cn('text-sm text-ink-subtle', className)} {...props} />;
+  return <p className={cn('text-[13px] leading-snug text-ink-subtle', className)} {...props} />;
 }
 
 function FieldMessage({ className, ...props }: React.ComponentProps<'p'>) {

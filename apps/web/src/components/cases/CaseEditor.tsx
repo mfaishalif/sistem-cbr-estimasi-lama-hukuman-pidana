@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { CaseDetailsFields } from '@/components/case/CaseDetailsFields';
 import { CategoryField } from '@/components/case/CategoryField';
 import { IdentityFields } from '@/components/case/IdentityFields';
+import { FORM_CONTAINER, FORM_GRID, SECTION_GAP } from '@/components/case/layout';
 import { NarrationField } from '@/components/case/NarrationField';
 import { Button } from '@/components/ui/button';
 import { ErrorSummary, errorFor } from '@/components/ui/error-summary';
@@ -105,11 +106,13 @@ export function CaseEditor({ open, onOpenChange, unit, onSaved }: CaseEditorProp
         </div>
       }
     >
-      <form id={`${PREFIX}-form`} noValidate onSubmit={submit} className="space-y-8">
+      <form id={`${PREFIX}-form`} noValidate autoComplete="off" onSubmit={submit} className={`${FORM_CONTAINER} ${SECTION_GAP}`}>
         <ErrorSummary title={copy.estimate.errorSummaryTitle} errors={errors} idPrefix={PREFIX} />
         <IdentityFields idPrefix={PREFIX} value={form} onChange={patch} errors={errors} disabled={saving} />
-        <NarrationField {...fields} />
-        <CategoryField {...fields} unknownLabel="Belum diketahui" />
+        <div className={FORM_GRID}>
+          <NarrationField {...fields} />
+          <CategoryField {...fields} unknownLabel="Belum diketahui" />
+        </div>
         <CaseDetailsFields {...fields} defaultOpen={unit !== undefined && detailSummary(caseFormFromUnit(unit)).length > 0} />
         <SentenceInput
           id={`${PREFIX}-outcome`}

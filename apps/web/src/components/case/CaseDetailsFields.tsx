@@ -7,6 +7,7 @@ import { formatInteger } from '@/lib/format';
 import { ActFields } from './ActFields';
 import { ArticleFields } from './ArticleFields';
 import { DefendantFields } from './DefendantFields';
+import { SECTION_GAP } from './layout';
 import type { FieldsProps } from './types';
 
 const DETAIL_FIELDS = /^(article-|age|victim-count)/;
@@ -39,7 +40,8 @@ export function CaseDetailsFields(props: FieldsProps & { defaultOpen?: boolean }
         )
       }
     >
-      <div className="space-y-8 pl-0 sm:pl-6">
+      {/* No indent: every field lines up with Kronologi. 40px between sections. */}
+      <div className={SECTION_GAP}>
         <ArticleFields {...props} />
         <DefendantFields {...props} />
         <ActFields {...props} />

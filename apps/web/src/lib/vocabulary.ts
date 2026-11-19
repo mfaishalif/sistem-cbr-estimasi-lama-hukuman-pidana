@@ -51,11 +51,12 @@ export const PRIOR_CONVICTION: Option<'yes' | 'no'>[] = [
   { value: 'no', label: 'Belum pernah' },
 ];
 
+// "penyuruh" is not offered: it never occurs in the 5.782 Indo-Law perkara.
+// A stored value is still shown through the humanizeSlug fallback.
 export const ROLES: Option[] = [
   { value: 'pelaku', label: 'Pelaku' },
   { value: 'turut-serta', label: 'Turut serta' },
   { value: 'pembantu', label: 'Pembantu' },
-  { value: 'penyuruh', label: 'Penyuruh' },
   { value: 'perantara', label: 'Perantara' },
   { value: 'penadah', label: 'Penadah' },
 ];
