@@ -394,10 +394,17 @@ Perintah menjalankan tiga tahap pada database evaluasi sendiri di
 Tahap dapat dipisah untuk pemeriksaan:
 
 ```bash
-docker compose --profile tools run --rm evaluate --stage prepare
-docker compose --profile tools run --rm evaluate --stage validate
-docker compose --profile tools run --rm evaluate --stage test
+docker compose --profile tools run --rm evaluate evaluate \
+  --workspace /workspace --artifacts /artifacts \
+  --source /sources/indo-law --stage prepare
+docker compose --profile tools run --rm evaluate evaluate \
+  --workspace /workspace --artifacts /artifacts --stage validate
+docker compose --profile tools run --rm evaluate evaluate \
+  --workspace /workspace --artifacts /artifacts --stage test
 ```
+
+Argumen setelah nama layanan menggantikan `command` pada `compose.yaml`, jadi
+perintah `evaluate` dan opsinya harus ditulis ulang.
 
 Tanpa Docker:
 
@@ -439,6 +446,39 @@ Fixture memakai workspace `data/evaluation-fixture` dan artefak
 `artifacts/evaluation-fixture`, dengan ambang minimum yang diperkecil agar alur
 lengkap dapat berjalan pada 90 unit sintetis. Angka fixture bukan hasil
 evaluasi Indo-Law dan tidak boleh dilaporkan sebagai hasil tugas kuliah.
+
+### 4. Hasil evaluasi Indo-Law
+
+Hasil protokol pada snapshot resmi tercatat di
+[`docs/evaluation/indo-law-evaluation.md`](docs/evaluation/indo-law-evaluation.md).
+Ringkasnya: dari 5.782 unit, split 4.048/867/867, konfigurasi
+`kandidat-15` dikunci dari validasi, lalu test 867 unit menunjukkan model
+gabungan berbobot mengestimasi 855 unit dengan MAE 371,7 hari (RMSE 660,8;
+MedAE 223,1). Pembanding median pada unit yang sama memberi MAE 393,9 hari
+(RMSE 746,8; MedAE 240,0). Varian narasi saja mencakup 863 unit dengan MAE 405,1
+hari, sedangkan varian gabungan tanpa bobot mencakup 855 unit dengan MAE 377,2
+hari.
+
+Untuk mengulang dari workspace terpisah tanpa menyentuh hasil utama:
+
+```bash
+mkdir -p data/evaluation-repro artifacts/evaluation-repro
+docker run --rm \
+  -e DATABASE_PATH=/workspace/evaluation.db \
+  -v "$PWD/data/raw:/sources:ro" \
+  -v "$PWD/data/evaluation-repro:/workspace" \
+  -v "$PWD/artifacts/evaluation-repro:/artifacts" \
+  cbr-estimasi-lama-hukuman:local \
+  node tools/cli/dist/index.js evaluate \
+  --workspace /workspace \
+  --artifacts /artifacts \
+  --source /sources/indo-law \
+  --stage all
+```
+
+Snapshot, database evaluasi, manifest terperinci, dan detail per unit tetap di
+`data/` dan `artifacts/` yang di-ignore Git. Repo hanya menyimpan laporan
+agregat.
 
 Batas isolasi:
 
