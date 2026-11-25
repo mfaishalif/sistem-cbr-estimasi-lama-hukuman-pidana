@@ -1,13 +1,18 @@
 /**
- * Retrieve and Reuse for one query.
+ * Retrieve dan Reuse untuk satu kueri.
  *
- * Retrieve ranks eligible historical cases by a weighted combination of
- * narrative cosine similarity and optional structured facts. Components that
- * are not known on both sides are excluded and the remaining weights are
- * renormalised. Reuse then takes a weighted average of actual outcomes.
+ * Retrieve memberi skor pada setiap kasus historis yang layak:
  *
- * Query scoring has no access to the case base through the application context:
- * everything it may use is frozen inside the supplied index.
+ *   skor = Σ(bobot × kemiripan) ÷ Σ(bobot komponen yang dapat dibandingkan)
+ *
+ * Kronologi (narasi) selalu dibandingkan. Pasal dakwaan dan atribut hanya
+ * dihitung bila diketahui di kedua sisi; bila tidak, komponen itu keluar dari
+ * pembilang dan penyebut, sehingga fakta yang kosong tidak menaikkan maupun
+ * menurunkan skor. Reuse lalu menghitung rata-rata hukuman aktual kasus
+ * terpilih, ditimbang dengan skornya.
+ *
+ * Penilaian kueri tidak mengakses basis kasus lewat konteks aplikasi: semua
+ * yang boleh dipakai sudah dibekukan di dalam indeks yang diberikan.
  */
 
 import {
@@ -36,11 +41,42 @@ import type { IndexedCase, RetrievalIndex } from './retrieval-index';
 import { computeWeightedReuse } from './reuse';
 import { cosineScores, transformNarrative, type SparseTermVector } from './tfidf';
 
+type CategoryRestriction = 'same-category' | 'all-categories';
+type QueryFacts = EstimateRequest['facts'];
+
+const SIMILARITY_FORMULA = 'sum(weight x similarity) / sum(available weight)';
+const REUSE_FORMULA = 'sum(score x actualSentenceDays) / sum(score)';
+
+/** Fakta sisi kueri, dihitung sekali lalu dipakai untuk semua kandidat. */
+interface StructuredQuery {
+  facts: QueryFacts;
+  articleKeys: readonly string[];
+  /** Atribut berbobot lebih dari nol, sesuai urutan di konfigurasi. */
+  attributes: readonly AttributeComponentConfig[];
+  attributeValues: ReadonlyMap<string, ExtractedAttribute>;
+  missingAttributeKeys: readonly string[];
+  attributeWeight: (component: AttributeComponentConfig) => number;
+  /** Total bobot komponen opsional yang diisi kueri; penyebut cakupan (coverage). */
+  knownWeight: number;
+}
+
+interface PreparedQuery extends StructuredQuery {
+  vector: SparseTermVector;
+}
+
 interface ScoredCandidate {
   indexed: IndexedCase;
   score: number;
   components: ScoreComponent[];
   comparison: ReferenceComparison;
+}
+
+/** Data yang sama untuk semua hasil dari satu permintaan. */
+interface ResultContext {
+  index: RetrievalIndex;
+  category: string | null;
+  restriction: CategoryRestriction;
+  query: QuerySummary;
 }
 
 function clampScore(value: number): number {
@@ -50,208 +86,249 @@ function clampScore(value: number): number {
   return value >= 1 ? 1 : value;
 }
 
-function queryAttributes(
-  requestFacts: EstimateRequest['facts'],
-  config: RetrievalConfig,
-): Map<string, ExtractedAttribute> {
-  const values = new Map<string, ExtractedAttribute>();
-  for (const component of config.components.attributes) {
-    if (component.weight === 0) {
-      continue;
-    }
-    const extracted = extractAttribute(requestFacts, component);
+// ---------------------------------------------------------------------------
+// Persiapan kueri
+// ---------------------------------------------------------------------------
+
+function prepareStructuredQuery(facts: QueryFacts, config: RetrievalConfig): StructuredQuery {
+  const { articleWeight, attributeGroupWeight } = config.components;
+  const articleKeys = articleReferences(facts.articles);
+  const attributes = config.components.attributes.filter((component) => component.weight > 0);
+
+  const attributeValues = new Map<string, ExtractedAttribute>();
+  for (const component of attributes) {
+    const extracted = extractAttribute(facts, component);
     if (extracted !== null) {
-      values.set(component.attributeKey, extracted);
+      attributeValues.set(component.attributeKey, extracted);
     }
   }
-  return values;
+  const missingAttributeKeys = attributes
+    .map((component) => component.attributeKey)
+    .filter((key) => !attributeValues.has(key));
+  const knownAttributes = attributes.filter((component) =>
+    attributeValues.has(component.attributeKey),
+  );
+
+  // Bila ada bobot kelompok, atribut yang diisi kueri membagi rata bobot itu
+  // (bobot ÷ n). Bila tidak, tiap atribut memakai bobotnya sendiri.
+  const knownAttributeCount = knownAttributes.length;
+  const attributeWeight = (component: AttributeComponentConfig): number => {
+    if (attributeGroupWeight === undefined) {
+      return component.weight;
+    }
+    return knownAttributeCount === 0 ? 0 : attributeGroupWeight / knownAttributeCount;
+  };
+
+  let knownWeight = 0;
+  if (articleKeys.length > 0 && articleWeight > 0) {
+    knownWeight += articleWeight;
+  }
+  if (attributeGroupWeight !== undefined) {
+    if (knownAttributeCount > 0) {
+      knownWeight += attributeGroupWeight;
+    }
+  } else {
+    for (const component of knownAttributes) {
+      knownWeight += component.weight;
+    }
+  }
+
+  return {
+    facts,
+    articleKeys,
+    attributes,
+    attributeValues,
+    missingAttributeKeys,
+    attributeWeight,
+    knownWeight,
+  };
 }
 
-function attributeComponent(
-  component: AttributeComponentConfig,
-  weight: number,
-  similarity: number,
-  detail: Record<string, unknown>,
+// ---------------------------------------------------------------------------
+// Retrieve: menilai satu kandidat
+// ---------------------------------------------------------------------------
+
+function scoreComponent(
+  fields: Omit<ScoreComponent, 'normalizedWeight' | 'contribution'>,
 ): ScoreComponent {
+  const { key, kind, weight, similarity, ...rest } = fields;
   return {
-    key: component.attributeKey,
-    kind: 'attribute',
+    key,
+    kind,
     weight,
-    // Recomputed once the total available weight is known.
+    // Diisi setelah total bobot yang tersedia untuk kandidat ini diketahui.
     normalizedWeight: 0,
     similarity,
     contribution: weight * similarity,
-    comparator: component.comparator,
-    detail,
+    ...rest,
   };
 }
 
 function scoreCandidate(
   indexed: IndexedCase,
   narrativeScore: number,
-  queryFacts: EstimateRequest['facts'],
-  queryVector: SparseTermVector,
-  queryAttributeValues: ReadonlyMap<string, ExtractedAttribute>,
-  queryArticleKeys: readonly string[],
-  queryMissingAttributeKeys: readonly string[],
+  query: PreparedQuery,
   index: RetrievalIndex,
 ): ScoredCandidate {
-  const config = index.config;
+  const weights = index.config.components;
   const components: ScoreComponent[] = [];
-  let availableWeight = config.components.narrativeWeight;
-  let queryKnownWeight = 0;
-  let comparableWeight = 0;
-
-  components.push({
-    key: 'narration',
-    kind: 'narrative',
-    weight: config.components.narrativeWeight,
-    normalizedWeight: 1,
-    similarity: narrativeScore,
-    contribution: config.components.narrativeWeight * narrativeScore,
-    detail: {
-      recognizedTermCount: queryVector.recognizedTermCount,
-    },
-  });
-
+  const comparedAttributeKeys: string[] = [];
   const missingCandidateAttributeKeys: string[] = [];
   const notComparableAttributeKeys: string[] = [];
-  const comparedAttributeKeys: string[] = [];
   const missingCandidateArticleKeys: string[] = [];
   let articlesCompared = false;
 
-  if (queryArticleKeys.length > 0 && config.components.articleWeight > 0) {
-    const weight = config.components.articleWeight;
-    queryKnownWeight += weight;
-    if (indexed.articles.length === 0) {
-      missingCandidateArticleKeys.push(...queryArticleKeys);
-    } else {
-      const compared = compareArticles(queryArticleKeys, indexed.articles);
-      availableWeight += weight;
-      comparableWeight += weight;
-      articlesCompared = true;
-      components.push({
-        key: 'articles',
-        kind: 'articles',
-        weight,
-        normalizedWeight: 0,
-        similarity: clampScore(compared.similarity),
-        contribution: weight * clampScore(compared.similarity),
-        detail: {
-          queryArticles: queryArticleKeys,
-          candidateArticles: indexed.articles,
-          intersection: compared.intersection,
-          union: compared.union,
-        },
-      });
-    }
-  }
+  // Penyebut skor. Kronologi selalu dapat dibandingkan.
+  let availableWeight = weights.narrativeWeight;
+  // Bobot opsional yang benar-benar dibandingkan; pembilang cakupan.
+  let comparableWeight = 0;
 
-  const groupWeight = config.components.attributeGroupWeight;
-  const participatingAttributes = config.components.attributes.filter(
-    (component) => component.weight > 0,
+  components.push(
+    scoreComponent({
+      key: 'narration',
+      kind: 'narrative',
+      weight: weights.narrativeWeight,
+      similarity: narrativeScore,
+      detail: { recognizedTermCount: query.vector.recognizedTermCount },
+    }),
   );
-  const knownAttributeCount =
-    groupWeight === undefined
-      ? 0
-      : participatingAttributes.filter((component) =>
-          queryAttributeValues.has(component.attributeKey),
-        ).length;
-  const attributeWeight = (component: AttributeComponentConfig): number => {
-    if (groupWeight === undefined) {
-      return component.weight;
-    }
-    return knownAttributeCount === 0 ? 0 : groupWeight / knownAttributeCount;
-  };
 
-  if (groupWeight !== undefined && knownAttributeCount > 0) {
-    queryKnownWeight += groupWeight;
+  if (query.articleKeys.length > 0 && weights.articleWeight > 0) {
+    if (indexed.articles.length === 0) {
+      missingCandidateArticleKeys.push(...query.articleKeys);
+    } else {
+      const compared = compareArticles(query.articleKeys, indexed.articles);
+      availableWeight += weights.articleWeight;
+      comparableWeight += weights.articleWeight;
+      articlesCompared = true;
+      components.push(
+        scoreComponent({
+          key: 'articles',
+          kind: 'articles',
+          weight: weights.articleWeight,
+          similarity: clampScore(compared.similarity),
+          detail: {
+            queryArticles: query.articleKeys,
+            candidateArticles: indexed.articles,
+            intersection: compared.intersection,
+            union: compared.union,
+          },
+        }),
+      );
+    }
   }
 
-  for (const component of participatingAttributes) {
-    const queryValue = queryAttributeValues.get(component.attributeKey);
+  for (const component of query.attributes) {
+    const key = component.attributeKey;
+    const queryValue = query.attributeValues.get(key);
     if (queryValue === undefined) {
       continue;
     }
-
-    if (groupWeight === undefined) {
-      queryKnownWeight += component.weight;
-    }
-    const candidateValue = indexed.attributeValues.get(component.attributeKey);
+    const candidateValue = indexed.attributeValues.get(key);
     if (candidateValue === undefined) {
-      missingCandidateAttributeKeys.push(component.attributeKey);
+      missingCandidateAttributeKeys.push(key);
       continue;
     }
 
-    const dateComparison = compareReferenceDates(
-      queryFacts,
-      indexed.facts,
-      component,
-    );
-    if (!dateComparison.comparable) {
-      notComparableAttributeKeys.push(component.attributeKey);
+    // Beberapa atribut (misalnya umur) hanya bermakna bila tanggal
+    // penangkapan kedua perkara berdekatan; di luar batas itu atribut dilewati.
+    const dates = compareReferenceDates(query.facts, indexed.facts, component);
+    if (!dates.comparable) {
+      notComparableAttributeKeys.push(key);
       continue;
     }
 
-    const compared = compareAttribute(
-      component,
-      queryValue,
-      candidateValue,
-      index.numericScales,
-    );
+    const compared = compareAttribute(component, queryValue, candidateValue, index.numericScales);
     const detail: Record<string, unknown> = { ...compared.detail };
-    if (dateComparison.gapDays !== null) {
-      detail.referenceDateGapDays = dateComparison.gapDays;
+    if (dates.gapDays !== null) {
+      detail.referenceDateGapDays = dates.gapDays;
     }
-    const weight = attributeWeight(component);
+
+    const weight = query.attributeWeight(component);
     availableWeight += weight;
     comparableWeight += weight;
-    comparedAttributeKeys.push(component.attributeKey);
+    comparedAttributeKeys.push(key);
     components.push(
-      attributeComponent(component, weight, clampScore(compared.similarity), detail),
+      scoreComponent({
+        key,
+        kind: 'attribute',
+        weight,
+        similarity: clampScore(compared.similarity),
+        comparator: component.comparator,
+        detail,
+      }),
     );
   }
 
   for (const component of components) {
     component.normalizedWeight = component.weight / availableWeight;
   }
-
   const totalContribution = components.reduce(
     (total, component) => total + component.contribution,
     0,
   );
-  const coverage = queryKnownWeight === 0 ? 1 : comparableWeight / queryKnownWeight;
 
   return {
     indexed,
     score: clampScore(totalContribution / availableWeight),
     components,
     comparison: {
-      queryKnownWeight,
+      queryKnownWeight: query.knownWeight,
       comparableWeight,
-      coverage,
+      // Porsi fakta opsional kueri yang dapat dibandingkan dengan kandidat ini.
+      coverage: query.knownWeight === 0 ? 1 : comparableWeight / query.knownWeight,
       comparedAttributeKeys,
       missingCandidateAttributeKeys,
       notComparableAttributeKeys,
-      queryMissingAttributeKeys,
+      queryMissingAttributeKeys: query.missingAttributeKeys,
       missingCandidateArticleKeys,
       articlesCompared,
     },
   };
 }
 
-function makeSummary(
-  index: RetrievalIndex,
-  partial: Omit<CandidateSummary, 'eligibleCaseCount' | 'selectedCount'>,
-): CandidateSummary {
+function rankCandidates(candidates: readonly ScoredCandidate[]): ScoredCandidate[] {
+  return [...candidates].sort((left, right) => {
+    if (right.score !== left.score) {
+      return right.score - left.score;
+    }
+    // Skor sama diurutkan menurut ID. Hukuman aktual tidak pernah ikut menentukan peringkat.
+    if (left.indexed.id < right.indexed.id) {
+      return -1;
+    }
+    return left.indexed.id > right.indexed.id ? 1 : 0;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Penyusunan hasil
+// ---------------------------------------------------------------------------
+
+function configuredAttributeWeight(config: RetrievalConfig): number {
+  return (
+    config.components.attributeGroupWeight ??
+    config.components.attributes.reduce((total, component) => total + component.weight, 0)
+  );
+}
+
+function emptyEstimate(): EstimateResult['estimate'] {
   return {
-    eligibleCaseCount: index.eligibleCaseCount,
-    selectedCount: 0,
-    ...partial,
+    days: null,
+    rawDays: null,
+    numerator: null,
+    denominator: null,
+    rounding: 'nearest-day-half-up',
   };
 }
 
-function makeScoringSummary(
+function candidateSummary(
+  index: RetrievalIndex,
+  counts: Omit<CandidateSummary, 'eligibleCaseCount'>,
+): CandidateSummary {
+  return { eligibleCaseCount: index.eligibleCaseCount, ...counts };
+}
+
+function scoringSummary(
   index: RetrievalIndex,
   candidates: CandidateSummary,
 ): EstimateScoringSummary {
@@ -260,55 +337,20 @@ function makeScoringSummary(
     configFingerprint: index.configFingerprint,
     narrativeWeight: config.components.narrativeWeight,
     articleWeight: config.components.articleWeight,
-    configuredAttributeWeight:
-      config.components.attributeGroupWeight ??
-      config.components.attributes.reduce(
-        (total, component) => total + component.weight,
-        0,
-      ),
+    configuredAttributeWeight: configuredAttributeWeight(config),
     maxReferences: config.retrieval.maxReferences,
     minReferences: config.retrieval.minReferences,
     minScore: config.retrieval.minScore,
     minAttributeCoverage: config.retrieval.minAttributeCoverage,
-    similarityFormula: 'sum(weight x similarity) / sum(available weight)',
-    reuseFormula: 'sum(score x actualSentenceDays) / sum(score)',
+    similarityFormula: SIMILARITY_FORMULA,
+    reuseFormula: REUSE_FORMULA,
     candidates,
   };
 }
 
-function withheld(
-  index: RetrievalIndex,
-  category: string | null,
-  restriction: 'same-category' | 'all-categories',
-  query: QuerySummary,
-  scoring: EstimateScoringSummary,
-  reason: Withholding,
-  references: readonly ReferenceDetail[] = [],
-): EstimateResult {
-  return {
-    status: 'withheld',
-    caseBaseGeneration: index.generation,
-    configFingerprint: index.configFingerprint,
-    category: { requested: category, restriction },
-    query,
-    estimate: {
-      days: null,
-      rawDays: null,
-      numerator: null,
-      denominator: null,
-      rounding: 'nearest-day-half-up',
-    },
-    withholding: reason,
-    references,
-    scoring,
-  };
-}
-
-function referenceDetails(
-  candidates: readonly ScoredCandidate[],
-): { references: ReferenceDetail[]; denominator: number } {
-  const denominator = candidates.reduce((total, candidate) => total + candidate.score, 0);
-  const references = candidates.map((candidate, position) => ({
+function referenceDetails(candidates: readonly ScoredCandidate[]): ReferenceDetail[] {
+  const totalScore = candidates.reduce((total, candidate) => total + candidate.score, 0);
+  return candidates.map((candidate, position) => ({
     rank: position + 1,
     caseUnitId: candidate.indexed.id,
     caseGroupId: candidate.indexed.caseGroupId,
@@ -319,199 +361,193 @@ function referenceDetails(
     comparison: candidate.comparison,
     reuse: {
       weight: candidate.score,
-      weightShare: denominator === 0 ? 0 : candidate.score / denominator,
+      weightShare: totalScore === 0 ? 0 : candidate.score / totalScore,
       weightedOutcomeDays: candidate.score * candidate.indexed.outcomeDays,
     },
     facts: candidate.indexed.facts,
     sources: candidate.indexed.sources,
   }));
-  return { references, denominator };
 }
 
-function stableSortCandidates(candidates: readonly ScoredCandidate[]): ScoredCandidate[] {
-  return [...candidates].sort((left, right) => {
-    if (right.score !== left.score) {
-      return right.score - left.score;
-    }
-    // Stable ID tie-break. Actual outcome is never part of ranking.
-    if (left.indexed.id < right.indexed.id) {
-      return -1;
-    }
-    return left.indexed.id > right.indexed.id ? 1 : 0;
-  });
-}
-
-export function estimateWithIndex(
-  index: RetrievalIndex,
-  request: EstimateRequest,
+function withheld(
+  context: ResultContext,
+  scoring: EstimateScoringSummary,
+  reason: Withholding,
+  references: readonly ReferenceDetail[] = [],
 ): EstimateResult {
+  return {
+    status: 'withheld',
+    caseBaseGeneration: context.index.generation,
+    configFingerprint: context.index.configFingerprint,
+    category: { requested: context.category, restriction: context.restriction },
+    query: context.query,
+    estimate: emptyEstimate(),
+    withholding: reason,
+    references,
+    scoring,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Fungsi utama
+// ---------------------------------------------------------------------------
+
+export function estimateWithIndex(index: RetrievalIndex, request: EstimateRequest): EstimateResult {
   const config = index.config;
-  const requestedCategory = normalizeCategoryName(request.facts.category);
-  const restriction: 'same-category' | 'all-categories' =
-    config.categoryRestriction === 'when-known' && requestedCategory !== null
+  const { maxReferences, minReferences, minScore, minAttributeCoverage } = config.retrieval;
+
+  // Kategori yang diketahui membatasi pencarian ke kategori itu; tidak pernah diperluas.
+  const category = normalizeCategoryName(request.facts.category);
+  const restriction: CategoryRestriction =
+    config.categoryRestriction === 'when-known' && category !== null
       ? 'same-category'
       : 'all-categories';
-
-  const queryAttributeValues = queryAttributes(request.facts, config);
-  const configuredAttributeKeys = config.components.attributes
-    .filter((component) => component.weight > 0)
-    .map((component) => component.attributeKey);
-  const queryMissingAttributeKeys = configuredAttributeKeys.filter(
-    (key) => !queryAttributeValues.has(key),
-  );
-  const queryArticleKeys = articleReferences(request.facts.articles);
-
   const categoryPool =
     restriction === 'same-category'
-      ? (index.categories.get(requestedCategory as string) ?? [])
+      ? (index.categories.get(category as string) ?? [])
       : index.allCaseIndices;
-  const excludeIds = new Set(request.excludeCaseUnitIds ?? []);
-  const afterExclusion = categoryPool.filter(
-    (caseIndex) => !excludeIds.has((index.cases[caseIndex] as IndexedCase).id),
+
+  // ID yang dikecualikan mencegah perkara dibandingkan dengan dirinya sendiri.
+  const excludedIds = new Set(request.excludeCaseUnitIds ?? []);
+  const candidatePool = categoryPool.filter(
+    (caseIndex) => !excludedIds.has((index.cases[caseIndex] as IndexedCase).id),
   );
 
-  const query: QuerySummary = {
+  const structured = prepareStructuredQuery(request.facts, config);
+  const querySummary: QuerySummary = {
     tokenCount: 0,
     recognizedTermCount: 0,
     vectorNorm: 0,
-    category: requestedCategory,
+    category,
     categoryRestriction: restriction,
     categoryCandidateCount: categoryPool.length,
-    articleCount: queryArticleKeys.length,
-    knownAttributeKeys: [...queryAttributeValues.keys()],
-    missingAttributeKeys: queryMissingAttributeKeys,
+    articleCount: structured.articleKeys.length,
+    knownAttributeKeys: [...structured.attributeValues.keys()],
+    missingAttributeKeys: structured.missingAttributeKeys,
   };
-  const emptyCandidates = makeSummary(index, {
+  const context: ResultContext = { index, category, restriction, query: querySummary };
+  const poolCounts = {
     searchScope: restriction,
     afterCategoryCount: categoryPool.length,
-    afterExclusionCount: afterExclusion.length,
-    scoredCount: 0,
-    rejectedBelowScore: 0,
-    rejectedCoverage: 0,
-  });
-  const emptyScoring = makeScoringSummary(index, emptyCandidates);
+    afterExclusionCount: candidatePool.length,
+  };
+  const emptyScoring = scoringSummary(
+    index,
+    candidateSummary(index, {
+      ...poolCounts,
+      scoredCount: 0,
+      rejectedBelowScore: 0,
+      rejectedCoverage: 0,
+      selectedCount: 0,
+    }),
+  );
 
   if (request.facts.narration.trim() === '') {
-    return withheld(index, requestedCategory, restriction, query, emptyScoring, {
+    return withheld(context, emptyScoring, {
       code: 'NARASI_KOSONG',
       message: 'Narasi fakta kosong; narasi wajib untuk Retrieve.',
     });
   }
 
   if (index.cases.length === 0) {
-    return withheld(index, requestedCategory, restriction, query, emptyScoring, {
+    return withheld(context, emptyScoring, {
       code: 'BASIS_KASUS_KOSONG',
       message: 'Tidak ada kasus historis layak dengan hasil aktual positif dalam basis kasus.',
     });
   }
 
-  const queryVector = transformNarrative(
-    index.termModel,
-    request.facts.narration,
-    config.preprocessing,
-  );
-  query.tokenCount = queryVector.tokenCount;
-  query.recognizedTermCount = queryVector.recognizedTermCount;
-  query.vectorNorm = queryVector.norm;
+  const vector = transformNarrative(index.termModel, request.facts.narration, config.preprocessing);
+  // Objek ringkasan ini dipakai bersama `context`, jadi hasil berikutnya ikut memuat angka ini.
+  querySummary.tokenCount = vector.tokenCount;
+  querySummary.recognizedTermCount = vector.recognizedTermCount;
+  querySummary.vectorNorm = vector.norm;
 
-  if (queryVector.recognizedTermCount === 0 || queryVector.norm === 0) {
-    return withheld(index, requestedCategory, restriction, query, emptyScoring, {
+  // Tanpa kronologi yang dapat dibandingkan, estimasi tidak dibuat; atribut
+  // saja tidak dipakai sebagai pengganti.
+  if (vector.recognizedTermCount === 0 || vector.norm === 0) {
+    return withheld(context, emptyScoring, {
       code: 'NARASI_TIDAK_TERBANDING',
       message:
         'Narasi tidak memuat istilah yang dikenali dari kosakata training; atribut tidak dipakai sebagai pengganti narasi.',
       details: {
-        tokenCount: queryVector.tokenCount,
-        recognizedTermCount: queryVector.recognizedTermCount,
+        tokenCount: vector.tokenCount,
+        recognizedTermCount: vector.recognizedTermCount,
       },
     });
   }
 
   if (categoryPool.length === 0) {
-    return withheld(index, requestedCategory, restriction, query, emptyScoring, {
+    return withheld(context, emptyScoring, {
       code: 'TIDAK_ADA_REFERENSI_KATEGORI',
       message:
         'Kategori input tidak memiliki kasus historis yang memenuhi syarat; pencarian tidak diperluas ke kategori lain.',
-      details: {
-        category: requestedCategory,
-        eligibleCaseCount: index.eligibleCaseCount,
-      },
+      details: { category, eligibleCaseCount: index.eligibleCaseCount },
     });
   }
 
-  if (afterExclusion.length === 0) {
-    return withheld(index, requestedCategory, restriction, query, emptyScoring, {
+  if (candidatePool.length === 0) {
+    return withheld(context, emptyScoring, {
       code: 'REFERENSI_TIDAK_CUKUP',
       message: 'Semua kandidat dikecualikan (termasuk kasus yang sedang diestimasi).',
       details: { excludedCaseCount: categoryPool.length },
     });
   }
 
-  const cosine = cosineScores(queryVector, index.documentNorms, index.postings);
-  const scored: ScoredCandidate[] = [];
+  // Retrieve: nilai semua kandidat, lalu buang yang skornya rendah atau cakupannya kurang.
+  const query: PreparedQuery = { ...structured, vector };
+  const cosine = cosineScores(vector, index.documentNorms, index.postings);
+  const accepted: ScoredCandidate[] = [];
   let rejectedBelowScore = 0;
   let rejectedCoverage = 0;
 
-  for (const caseIndex of afterExclusion) {
+  for (const caseIndex of candidatePool) {
     const indexed = index.cases[caseIndex] as IndexedCase;
     const narrativeScore = clampScore(cosine.get(caseIndex) ?? 0);
-    const candidate = scoreCandidate(
-      indexed,
-      narrativeScore,
-      request.facts,
-      queryVector,
-      queryAttributeValues,
-      queryArticleKeys,
-      queryMissingAttributeKeys,
-      index,
-    );
+    const candidate = scoreCandidate(indexed, narrativeScore, query, index);
 
-    if (candidate.score <= config.retrieval.minScore || candidate.score <= 0) {
+    if (candidate.score <= minScore || candidate.score <= 0) {
       rejectedBelowScore += 1;
-      continue;
-    }
-    if (candidate.comparison.coverage < config.retrieval.minAttributeCoverage) {
+    } else if (candidate.comparison.coverage < minAttributeCoverage) {
       rejectedCoverage += 1;
-      continue;
+    } else {
+      accepted.push(candidate);
     }
-    scored.push(candidate);
   }
 
-  const ranked = stableSortCandidates(scored);
-  const selected = ranked.slice(0, config.retrieval.maxReferences);
-  const candidates = makeSummary(index, {
-    searchScope: restriction,
-    afterCategoryCount: categoryPool.length,
-    afterExclusionCount: afterExclusion.length,
-    scoredCount: scored.length,
-    rejectedBelowScore,
-    rejectedCoverage,
-  });
-  candidates.selectedCount = selected.length;
-  const scoring = makeScoringSummary(index, candidates);
-  const builtReferences = referenceDetails(selected);
+  const selected = rankCandidates(accepted).slice(0, maxReferences);
+  const scoring = scoringSummary(
+    index,
+    candidateSummary(index, {
+      ...poolCounts,
+      scoredCount: accepted.length,
+      rejectedBelowScore,
+      rejectedCoverage,
+      selectedCount: selected.length,
+    }),
+  );
+  const references = referenceDetails(selected);
 
-  if (selected.length < config.retrieval.minReferences) {
+  // Referensi terlalu sedikit: estimasi ditahan, bukan diisi dengan kasus yang tidak mirip.
+  if (selected.length < minReferences) {
     return withheld(
-      index,
-      requestedCategory,
-      restriction,
-      query,
+      context,
       scoring,
       {
         code: 'REFERENSI_TIDAK_CUKUP',
-        message: `Hanya ${selected.length} referensi layak; minimum ${config.retrieval.minReferences}. Estimasi ditahan, bukan diisi dengan kasus sembarang.`,
+        message: `Hanya ${selected.length} referensi layak; minimum ${minReferences}. Estimasi ditahan, bukan diisi dengan kasus sembarang.`,
         details: {
           selectedCount: selected.length,
-          minReferences: config.retrieval.minReferences,
-          maxReferences: config.retrieval.maxReferences,
+          minReferences,
+          maxReferences,
           rejectedBelowScore,
           rejectedCoverage,
         },
       },
-      builtReferences.references,
+      references,
     );
   }
 
+  // Reuse: rata-rata hukuman aktual kasus terpilih, ditimbang dengan skornya.
   const reuse = computeWeightedReuse(
     selected.map((candidate) => ({
       caseUnitId: candidate.indexed.id,
@@ -521,17 +557,14 @@ export function estimateWithIndex(
   );
   if (reuse.status !== 'available') {
     return withheld(
-      index,
-      requestedCategory,
-      restriction,
-      query,
+      context,
       scoring,
       {
         code: 'BOBOT_NOL',
         message: 'Jumlah bobot referensi nol; Reuse tidak dapat dihitung.',
         details: { reason: reuse.reason },
       },
-      builtReferences.references,
+      references,
     );
   }
 
@@ -539,8 +572,8 @@ export function estimateWithIndex(
     status: 'estimated',
     caseBaseGeneration: index.generation,
     configFingerprint: index.configFingerprint,
-    category: { requested: requestedCategory, restriction },
-    query,
+    category: { requested: category, restriction },
+    query: querySummary,
     estimate: {
       days: reuse.days,
       rawDays: reuse.rawDays,
@@ -549,12 +582,12 @@ export function estimateWithIndex(
       rounding: 'nearest-day-half-up',
     },
     withholding: null,
-    references: builtReferences.references,
+    references,
     scoring,
   };
 }
 
-/** A minimal result for callers that could not obtain an index. */
+/** Hasil minimal untuk pemanggil yang belum mendapatkan indeks. */
 export function withheldForUnavailableIndex(options: {
   code: Extract<WithholdingCode, 'INDEKS_BELUM_SIAP' | 'INDEKS_GAGAL_DIBANGUN'>;
   message: string;
@@ -580,13 +613,7 @@ export function withheldForUnavailableIndex(options: {
       knownAttributeKeys: [],
       missingAttributeKeys: [],
     },
-    estimate: {
-      days: null,
-      rawDays: null,
-      numerator: null,
-      denominator: null,
-      rounding: 'nearest-day-half-up',
-    },
+    estimate: emptyEstimate(),
     withholding: {
       code: options.code,
       message: options.message,
@@ -597,19 +624,13 @@ export function withheldForUnavailableIndex(options: {
       configFingerprint: options.configFingerprint,
       narrativeWeight: config?.components.narrativeWeight ?? 0,
       articleWeight: config?.components.articleWeight ?? 0,
-      configuredAttributeWeight:
-        config?.components.attributeGroupWeight ??
-        config?.components.attributes.reduce(
-          (total, component) => total + component.weight,
-          0,
-        ) ??
-        0,
+      configuredAttributeWeight: config === undefined ? 0 : configuredAttributeWeight(config),
       maxReferences: config?.retrieval.maxReferences ?? 0,
       minReferences: config?.retrieval.minReferences ?? 0,
       minScore: config?.retrieval.minScore ?? 0,
       minAttributeCoverage: config?.retrieval.minAttributeCoverage ?? 0,
-      similarityFormula: 'sum(weight x similarity) / sum(available weight)',
-      reuseFormula: 'sum(score x actualSentenceDays) / sum(score)',
+      similarityFormula: SIMILARITY_FORMULA,
+      reuseFormula: REUSE_FORMULA,
       candidates: {
         eligibleCaseCount: 0,
         searchScope: 'all-categories',
