@@ -139,7 +139,11 @@ export function candidateFlow(result: EstimateResult): CandidateStep[] {
   }
   steps.push({ label: 'dibandingkan', count: c.scoredCount });
   if (c.rejectedBelowScore > 0) {
-    steps.push({ label: 'tidak dipakai karena kemiripan di bawah ambang', count: c.rejectedBelowScore });
+    // The engine rejects score <= minScore, so a score equal to the threshold is also dropped.
+    steps.push({
+      label: `tidak dipakai karena kemiripan tidak melebihi ambang ${formatPercent(result.scoring.minScore)}`,
+      count: c.rejectedBelowScore,
+    });
   }
   if (c.rejectedCoverage > 0) {
     steps.push({ label: 'tidak dipakai karena detail perkara kurang lengkap untuk dibandingkan', count: c.rejectedCoverage });
