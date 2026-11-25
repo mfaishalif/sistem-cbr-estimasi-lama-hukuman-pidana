@@ -57,7 +57,6 @@ export function DefendantFields({ idPrefix, form, patch, errors, disabled }: Fie
           <Field
             id={`${idPrefix}-age-date`}
             label="Tanggal penangkapan"
-            hint="Umur hanya dibandingkan dengan putusan yang tanggal penangkapannya berdekatan."
             error={dateError}
             className={`${span.date} col-start-1`}
           >
@@ -67,7 +66,7 @@ export function DefendantFields({ idPrefix, form, patch, errors, disabled }: Fie
               value={form.ageReferenceDate}
               onChange={(event) => patch({ ageReferenceDate: event.target.value })}
               aria-invalid={dateError === undefined ? undefined : true}
-              aria-describedby={describedBy(`${idPrefix}-age-date`, { hint: true, error: dateError })}
+              aria-describedby={describedBy(`${idPrefix}-age-date`, { error: dateError })}
               aria-required
               className="tabular"
               autoComplete="off"
